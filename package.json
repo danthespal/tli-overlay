@@ -1,0 +1,32 @@
+{
+  "name": "tli-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Torchlight: Infinite reward overlay - log engine and mechanic modules",
+  "type": "module",
+  "scripts": {
+    "audit": "tsx src/cli/audit.ts",
+    "read-cards": "tsx src/cli/read-cards.ts",
+    "read-flames": "tsx src/cli/read-flames.ts",
+    "watch": "tsx src/cli/watch.ts",
+    "calibrate": "tsx src/cli/calibrate.ts",
+    "backfill-salvage": "tsx src/cli/salvage.ts",
+    "overlay": "electron src/overlay/start.mjs",
+    "build-flame-icons": "tsx src/cli/build-flame-icons.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pngjs": "^6.0.5",
+    "electron": "^45.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
+    "tesseract.js": "^7.0.0"
+  }
+}

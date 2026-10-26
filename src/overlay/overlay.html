@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TLI overlay</title>
+<style>
+  :root {
+    --white: #c8d2dc; --blue: #4f7fe0; --purple: #b04fe0; --orange: #f0b030;
+    --good: #3ddc84; --panel: rgba(12, 10, 24, 0.82); --text: #eef0f6; --muted: #a9adc2;
+  }
+  html, body { margin: 0; background: transparent; overflow: hidden; pointer-events: none;
+    font-family: "Segoe UI", system-ui, sans-serif; color: var(--text); }
+  /* Positioned over the game client area; children use 1920x1080 coordinates. */
+  #stage { position: absolute; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  .box { position: absolute; background: var(--panel); border-radius: 8px; padding: 8px 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); font-size: 15px; line-height: 1.3; }
+  .card { width: 300px; border-left: 5px solid var(--white); }
+  .box.best { outline: 2px solid var(--good); }
+  .rank { display: inline-block; font-weight: 700; font-size: 13px; padding: 1px 7px; border-radius: 10px;
+    background: #444a63; margin-right: 6px; }
+  .best .rank { background: var(--good); color: #062; }
+  .label { font-weight: 600; }
+  .detail { font-size: 12px; color: var(--muted); }
+  .flame { font-size: 14px; padding: 4px 8px; white-space: nowrap; border: 1px dashed #777; }
+  .flame.confirmed { border-style: solid; border-color: #aab; }
+  .flame.whisper { border-color: #4fd0e0; }
+  .flame.bestflame { outline: 2px solid var(--good); }
+  .flame.bestflame .rank { background: var(--good); color: #062; }
+  .panel { left: 1560px; top: 82px; width: 330px; }
+  .panel h1 { font-size: 15px; margin: 0 0 6px; }
+  .pick { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--white); flex: none; }
+  .status { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .chest { margin-top: 6px; padding-top: 6px; border-top: 1px solid #444a63; font-size: 12px; }
+  .white { --c: var(--white); } .blue { --c: var(--blue); } .purple { --c: var(--purple); } .orange { --c: var(--orange); }
+  .card.white, .card.blue, .card.purple, .card.orange { border-left-color: var(--c); }
+  .dot.white, .dot.blue, .dot.purple, .dot.orange { background: var(--c); }
+  .up { color: var(--good); } .down { color: #ff7a7a; }
+  .goals { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+  .goal { pointer-events: auto; cursor: pointer; font-size: 12px; padding: 2px 8px; border-radius: 10px;
+    background: #2a2d40; color: var(--muted); border: 1px solid #444a63; }
+  .goal:hover { border-color: #aab; color: var(--text); }
+  .goal.on { background: var(--good); color: #062; border-color: var(--good); font-weight: 700; }
+  .ask { font-size: 12px; color: var(--orange); font-weight: 600; }
+  .panel { pointer-events: auto; }
+  /* Tier (S-D): the card or flame on its own, like a tier list. */
+  .tier { display: inline-block; min-width: 18px; text-align: center; font-weight: 800; font-size: 13px;
+    padding: 1px 4px; border-radius: 4px; margin-right: 6px; color: #111; }
+  .tier.S { background: #ffb020; } .tier.A { background: #c066f0; } .tier.B { background: #5b8cf0; }
+  .tier.C { background: #9aa0b4; } .tier.D { background: #5a6075; color: #ddd; }
+  .score { font-size: 12px; margin-top: 3px; }
+  .score b { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+  // Card text centres on the Seal Whisper screen (1920x1080), see 07-choice-screens.md.
+  const CARD_X = { left: 518, middle: 960, right: 1415 };
+  const stage = document.getElementById("stage");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const tier = (t) => (t ? `<span class="tier ${t}" title="Tier: how strong on its own">${t}</span>` : "");
+  /**
+   * final ×N: the expected final chest vs a chest with no Whispers (what ★ BEST is based on, so the
+   * best card has the highest); now +X%: how much the card raises the current chest right now.
+   */
+  const scores = (c) => {
+    const now = Math.round(c.nowPct);
+    return `<div class="score detail" title="final: expected 6-card chest vs no Whispers (decides BEST) · now: what it adds to your chest right away">final <b>×${c.final.toFixed(2)}</b> · now <b class="${now < 0 ? "down" : ""}">${now >= 0 ? "+" : ""}${now}%</b> chest</div>`;
+  };
+
+  function render(s) {
+    const k = s.game.width / 1920;
+    stage.style.left = `${s.game.x}px`;
+    stage.style.top = `${s.game.y}px`;
+    stage.style.transform = `scale(${k})`;
+    const html = [];
+
+    // One BEST for the whole screen: when the Switch card (already read) beats the best of the 3,
+    // it is the BEST and none of the 3 gets the badge (they move down one place).
+    const sw = s.switchCard;
+    const switchWins = !!sw && sw.diff !== null && sw.diff > 0 && !sw.tie;
+    if (s.screen === "cards" && s.view === "three") {
+      for (const c of s.cards) {
+        // A tie: every card within the margin of the best gets the same green "EITHER" badge.
+        const isBest = c.rank === 1 && !switchWins;
+        const tie = c.tie && !switchWins; // a tie with the Switch card would make it EITHER, not BEST
+        const badge = tie ? "≈ EITHER" : isBest ? "★ BEST" : "#" + (switchWins ? c.rank + 1 : c.rank);
+        html.push(`<div class="box card ${c.rarity ?? ""} ${isBest || tie ? "best" : ""}" style="left:${CARD_X[c.slot] - 150}px; top:212px">
+          ${tier(c.tier)}<span class="rank">${badge}</span><span class="label">${esc(c.label)}</span>
+          <div class="detail">${esc(c.reason)}</div>${scores(c)}</div>`);
+      }
+      if (!s.switchCard && s.switchHint) {
+        // Switch not pressed yet: is the unknown Switch card worth the clicks?
+        const pct = Math.round(s.switchHint.chance * 100);
+        html.push(`<div class="box" style="left:1080px; top:160px; font-size:13px">${pct > 0
+          ? `Switch: <b class="up">worth a look</b> · ${pct}% chance it beats the best`
+          : 'Switch: <b class="down">skip</b> · no rarity beats the best'}</div>`);
+      }
+      if (sw && sw.diff !== null) {
+        const badge = switchWins ? "★ BEST" : sw.tie ? "≈ EITHER" : "▼ WORSE";
+        const what = switchWins ? "press Switch and take it" : sw.tie ? "same as the best of these 3" : "keep one of these 3";
+        html.push(`<div class="box ${switchWins || sw.tie ? "best" : ""}" style="left:1080px; top:118px; width:340px; font-size:13px">${tier(sw.tier)}<span class="rank">${badge}</span>Switch card: <b>${esc(sw.label)}</b>
+          <div class="detail">${what}</div>${scores(sw)}</div>`);
+      }
+    }
+    if (s.screen === "cards" && s.view === "switch" && s.switchCard) {
+      const d = s.switchCard.diff;
+      // d null: the 3 cards weren't read (started on this view), so no verdict. Same words as the 3-card view.
+      const verdict = d === null ? "?" : s.switchCard.tie ? "≈ EITHER" : d > 0 ? "★ BEST" : "▼ WORSE";
+      const best3 = s.cards.find((c) => c.rank === 1);
+      const detail = d === null
+        ? "3 cards not read: press Return once to compare"
+        : `${s.switchCard.tie ? "same as" : d > 0 ? "better than" : "worse than"} the best of the 3 cards${best3 ? ` (final ×${best3.final.toFixed(2)})` : ""}`;
+      html.push(`<div class="box card ${s.switchCard.rarity ?? ""} ${d > 0 || s.switchCard.tie ? "best" : ""}" style="left:810px; top:212px">
+        ${tier(s.switchCard.tier)}<span class="rank">${verdict}</span><span class="label">${esc(s.switchCard.label)}</span>
+        <div class="detail">${detail}</div>${scores(s.switchCard)}</div>`);
+    }
+    if (s.screen === "flames") {
+      for (const f of s.flames) {
+        const pos = f.side === "left" ? `right:${1920 - (f.x - 48)}px` : `left:${f.x + 48}px`;
+        html.push(`<div class="box flame ${f.confirmed ? "confirmed" : ""} ${f.kind ?? ""} ${f.best ? "bestflame" : ""}" style="${pos}; top:${f.y - 16}px">${tier(f.tier)}${f.best ? '<span class="rank">★ PUT IN</span>' : ""}${esc(f.label)}</div>`);
+      }
+    }
+    if (s.notice) html.push(`<div class="box" style="left:1560px; top:82px; width:330px; font-size:12px">Black Sail overlay: ${esc(s.notice)}</div>`);
+    if (s.screen !== "none" || s.showPanel) {
+      const picks = s.picks.map((p) => `<div class="pick"><span class="dot ${p.rarity ?? ""}"></span>${esc(p.label)}</div>`).join("");
+      const goals = s.goals.map((g) => `<span class="goal ${g.id === s.goal ? "on" : ""}" data-goal="${esc(g.id)}">${esc(g.label)}</span>`).join("");
+      const ask = s.askGoal ? '<div class="ask">New cycle: what do you farm?</div>' : "";
+      const chest = s.lastChest
+        ? `<div class="chest">Chest ${s.lastChest.cycle}: ${s.lastChest.scraps} Scraps · ${s.lastChest.threads} Threads · ${s.lastChest.heroMemories} Mem · ${s.lastChest.invitations} Inv
+           <b>≈ ${s.lastChest.fe.toFixed(0)} FE</b> <span class="detail">(model ${s.lastChest.modelFe.toFixed(0)})</span></div>`
+        : "";
+      const set = s.setScore !== null && s.picks.length ? ` · set ×${s.setScore.toFixed(2)}` : "";
+      html.push(`<div class="box panel" id="panel"><h1>Black Sail · cycle ${s.cycle} · ${s.picks.length}/6${set}</h1>
+        ${ask}<div class="goals">${goals}</div>
+        ${picks || '<div class="detail">no Whispers picked yet</div>'}${chest}<div class="status">${esc(s.status)}</div></div>`);
+    }
+    stage.innerHTML = html.join("");
+    // The main process makes the window clickable while the cursor is inside this box (screen
+    // pixels of the window, scale included). The game keeps mouse events to itself, so the page
+    // can't detect hovering on its own.
+    const panel = document.getElementById("panel");
+    const r = panel && panel.getBoundingClientRect();
+    window.overlay.setPanelRect(r ? { x: r.left, y: r.top, width: r.width, height: r.height } : null);
+  }
+
+  window.overlay.onState(render);
+  stage.addEventListener("click", (e) => {
+    const g = e.target.closest("[data-goal]");
+    if (g) window.overlay.setGoal(g.dataset.goal);
+  });
+  window.overlay.onBackground((url) => {
+    document.body.style.background = `url("${url}") 0 0 / 1920px 1080px no-repeat`;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>TLI capture</title></head>
+<body>
+<script>
+  // Holds a share of the GAME WINDOW (Windows Graphics Capture through Chromium), started and
+  // stopped by the main process around a Black Sail choice screen. A share gives the game's own
+  // pixels: nothing drawn on top of it (this overlay, other windows) is in the picture, and the
+  // game needn't be in front. Frames are only taken when the main process asks for one.
+  let video = null;
+  let stream = null;
+  // Bumped by every stop/start: a share that finishes starting after a newer stop or start is
+  // thrown away instead of running on unseen.
+  let generation = 0;
+
+  function stop() {
+    generation++;
+    if (stream) for (const t of stream.getTracks()) t.stop();
+    stream = null;
+    video = null;
+  }
+  window.cap.onStop(stop);
+
+  window.cap.onStart(async (sourceId) => {
+    stop();
+    const gen = generation;
+    const stale = (s) => {
+      if (gen === generation) return false;
+      for (const t of s.getTracks()) t.stop();
+      return true;
+    };
+    try {
+      let s;
+      try {
+        // Electron: a desktopCapturer source by id. No picker, no user gesture needed.
+        s = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId, maxFrameRate: 15 } },
+        });
+      } catch (e) {
+        if (gen !== generation) return;
+        window.cap.log(`getUserMedia failed (${e.message}); trying getDisplayMedia`);
+        s = await navigator.mediaDevices.getDisplayMedia({ audio: false, video: { frameRate: 15 } });
+      }
+      if (stale(s)) return;
+      stream = s;
+      video = document.createElement("video");
+      video.muted = true;
+      video.srcObject = stream;
+      await video.play();
+      if (stale(s)) return;
+      s.getVideoTracks()[0].addEventListener("ended", () => {
+        if (stream !== s) return;
+        stop();
+        window.cap.ended();
+      });
+      window.cap.started({ ok: true, width: video.videoWidth, height: video.videoHeight });
+    } catch (e) {
+      if (gen !== generation) return;
+      stop();
+      window.cap.started({ ok: false, reason: e.message });
+    }
+  });
+
+  // One JPEG of the current frame, cut to the game's client area. `win` and `client` are the
+  // window's frame and client rectangles in screen pixels; the shared frame is either the whole
+  // window (then it is cropped) or already the client area.
+  window.cap.onGrab(async ({ id, win, client }) => {
+    if (!video || !video.videoWidth) return window.cap.grabbed({ id, ok: false, reason: "no window stream" });
+    // Always answer: without a reply the main process waits out its 3 s timeout.
+    try {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const isClient = Math.abs(vw - client.width) <= 2 && Math.abs(vh - client.height) <= 2;
+      const sx = vw / (isClient ? client.width : win.width);
+      const sy = vh / (isClient ? client.height : win.height);
+      const ox = isClient ? 0 : (client.x - win.x) * sx;
+      const oy = isClient ? 0 : (client.y - win.y) * sy;
+      const c = document.createElement("canvas");
+      c.width = Math.round(client.width * sx);
+      c.height = Math.round(client.height * sy);
+      c.getContext("2d").drawImage(video, ox, oy, c.width, c.height, 0, 0, c.width, c.height);
+      const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
+      if (!blob) return window.cap.grabbed({ id, ok: false, reason: "empty frame" });
+      window.cap.grabbed({ id, ok: true, buffer: await blob.arrayBuffer(), width: c.width, height: c.height });
+    } catch (e) {
+      window.cap.grabbed({ id, ok: false, reason: `frame failed: ${e.message}` });
+    }
+  });
+</script>
+</body>
+</html>

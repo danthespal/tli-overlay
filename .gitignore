@@ -1,0 +1,5 @@
+node_modules/
+dist/
+reports/
+data/dataset/
+data/history/
