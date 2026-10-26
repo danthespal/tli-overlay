@@ -1,6 +1,6 @@
 # Collected Black Sail data
 
-0 records from 0 installs, 0 sessions. Last pull: 2026-10-26T09:21:19.210Z.
+0 records from 0 installs, 0 sessions. Newest record: none.
 
 ## Records
 

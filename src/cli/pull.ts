@@ -83,7 +83,9 @@ async function refit(rows: Row[]) {
     salvages: of("salvage") as unknown as SalvageLike[],
   };
   const cfg = await loadAdvisorConfig(DEFAULT_ADVISOR_CONFIG);
-  const next = calibrate(cfg, history);
+  // Dated by the newest record, not the clock: a pull with nothing new changes no file (no commit).
+  const newest = rows.reduce((t, r) => (r.time > t ? r.time : t), "");
+  const next = calibrate(cfg, history, newest ? new Date(newest) : new Date(0));
   await writeFile(join(DIR, "advisor-config.json"), JSON.stringify(next, null, 2) + "\n");
 
   // Reader health: cards read without a matching effect, and why frames weren't read.
@@ -96,7 +98,7 @@ async function refit(rows: Row[]) {
   const lines = [
     "# Collected Black Sail data",
     "",
-    `${rows.length} records from ${new Set(rows.map((r) => r.install)).size} installs, ${sessions.length} sessions. Last pull: ${new Date().toISOString()}.`,
+    `${rows.length} records from ${new Set(rows.map((r) => r.install)).size} installs, ${sessions.length} sessions. Newest record: ${newest || "none"}.`,
     "",
     "## Records", "", "| kind | records |", "|---|---|", table(count(rows, (r) => r.kind)),
     "",
