@@ -1,4 +1,4 @@
-// Recalibrates mechanics/black-sail/data/advisor-config.json from the play history.
+// Recalibrates data/black-sail/advisor-config.json from the play history.
 //
 //   npm run calibrate            -> read tool/data/history/, print old vs new, write the config
 //   npm run calibrate -- --dry   -> print only

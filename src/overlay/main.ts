@@ -2,18 +2,23 @@
 // sends a small "what to draw" state to a transparent, click-through window over the game.
 // Started by start.mjs (registers tsx so this TypeScript runs as-is).
 
-import { app, BrowserWindow, ipcMain, screen } from "electron";
-import { appendFile, mkdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from "electron";
+import { existsSync, readFileSync } from "node:fs";
+import { appendFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { release, tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Dataset } from "../capture/dataset.js";
 import type { GrabResult } from "../capture/windowCapture.js";
 import { CaptureWorker, warmOnScreens } from "../capture/worker.js";
 import { GameCapture } from "../capture/gameCapture.js";
-import { LOG_DIR } from "../config.js";
-import { USER_DIR } from "../paths.js";
+import { APP_DIR, PACKAGED, USER_DIR } from "../paths.js";
+import { loadSettings, saveSettings } from "../settings.js";
+import { COLLECTOR } from "../share/endpoint.js";
+import { MAX_IMAGE, type Kind } from "../share/schema.js";
+import { Sharer } from "../share/sharer.js";
 import { Engine } from "../engine/engine.js";
+import { findLog, gameLogDirs, gameProgram, gameRunning, STALE_MS } from "../engine/findLog.js";
 import { LogTailer } from "../engine/logReader.js";
 import { configForGoal, DEFAULT_GOAL, loadAdvisorConfig, setScore, type Tier } from "../modules/black-sail/advisor.js";
 import { chestReport } from "../modules/black-sail/calibrate.js";
@@ -71,6 +76,8 @@ export interface OverlayState {
   askGoal: boolean;
   /** Shown even when no Black Sail screen is open (e.g. the log file is missing). */
   notice: string | null;
+  /** Anonymous data sharing: available in this build, still to be asked (first start), on. */
+  share: { available: boolean; ask: boolean; on: boolean };
 }
 
 const FLAME_LABEL: Record<string, string> = {
@@ -137,6 +144,7 @@ async function main() {
     goals: [],
     askGoal: false,
     notice: null,
+    share: { available: false, ask: false, on: false },
   };
   // Timers and late events can fire while the app quits, after the window is gone.
   const send = () => {
@@ -152,8 +160,54 @@ async function main() {
   await dataset.init();
   const scratch = join(tmpdir(), "tli-overlay");
   await mkdir(scratch, { recursive: true });
-  const done = keepFrames ? undefined : (file: string) => rm(file, { force: true });
-  const record = (kind: string, data: Record<string, unknown>) => dataset.record(kind, data);
+  // The last frame and what was read from it are kept (one file, in the temp folder) for a
+  // report ("that was wrong"); every other frame is deleted once read.
+  let lastFrame: { screen: string; path: string; read: Record<string, unknown> | null; used: boolean } | null = null;
+  const drop = (file: string) => rm(file, { force: true });
+  const done = keepFrames
+    ? undefined
+    : async (file: string) => {
+        if (lastFrame?.path === file) lastFrame.used = true;
+        else await drop(file);
+      };
+
+  // Anonymous sharing (src/share/): asked once, then the dataset lines below go to the collector
+  // too. Development runs and --demo never share (no collector address).
+  const settings = await loadSettings();
+  const APP_VERSION = PACKAGED ? app.getVersion() : (JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")) as { version: string }).version;
+  const sharer = new Sharer({
+    dir: USER_DIR,
+    endpoint: process.argv.includes("--demo") ? "" : COLLECTOR,
+    app: APP_VERSION,
+    settings,
+    saveSettings,
+    onLog: (m) => console.log(`[share] ${m}`),
+  });
+  await sharer.load();
+  const refreshShare = () => (state.share = { available: sharer.available, ask: sharer.asking, on: sharer.on });
+  refreshShare();
+  const SHARED = new Set<Kind>(["capture", "cards", "flames", "skipped", "picked", "flameChosen", "chest", "bossRun", "salvage", "goal"]);
+  const record = (kind: string, data: Record<string, unknown>) => {
+    dataset.record(kind, data);
+    if ((kind === "cards" || kind === "flames") && lastFrame) lastFrame.read = data;
+    if (SHARED.has(kind as Kind)) {
+      const { frame: _frame, ...shared } = data; // a file name on this PC, means nothing elsewhere
+      sharer.add(kind as Kind, shared);
+    }
+  };
+  let logBy = "not found"; // how the log was found, for the session record
+  const shareSession = () => {
+    const d = screen.getPrimaryDisplay();
+    sharer.add("session", {
+      os: release(),
+      displays: screen.getAllDisplays().length,
+      display: { width: d.size.width, height: d.size.height, scale: d.scaleFactor },
+      ocr: process.env.TLI_OCR === "windows" ? "windows" : "tesseract",
+      log: logBy,
+      calibratedChests: config.calibration?.chests ?? 0,
+    });
+  };
+  let captureShared = false;
   const frameName = (file?: string) => (file && keepFrames ? basename(file) : undefined);
   // Grabs and reads go through one PowerShell process that is started when a choice screen opens
   // and stopped 20 s after its last request, so a click frame lands in ~0.1 s instead of ~0.5 s.
@@ -177,11 +231,20 @@ async function main() {
   /** Grabs a frame and remembers where the game window is, so drawings line up with it. */
   const grabAs = (screenName: string) => async (trigger: string): Promise<GrabResult> => {
     const path = keepFrames ? dataset.framePath(screenName, trigger) : join(scratch, `${screenName}_${Date.now()}.jpg`);
+    if (lastFrame?.used && !keepFrames) void drop(lastFrame.path);
+    lastFrame = { screen: screenName, path, read: null, used: false };
     let g = await capture.grab(path);
+    let via = "share";
     if (!g.ok && g.reason.startsWith("no window share")) {
       if (!fallbackNoted) console.log(`[capture] ${g.reason}; using the screen copy (game must be in front)`);
       fallbackNoted = true;
       g = await worker.grab(path);
+      via = "copy";
+    }
+    if (g.ok && !captureShared) {
+      // Once a session: the game's size and how frames are taken on this PC.
+      captureShared = true;
+      record("capture", { width: g.width, height: g.height, via });
     }
     if (!g.ok) record("skipped", { screen: screenName, trigger, reason: g.reason });
     if (g.ok && g.x !== undefined && g.y !== undefined && !win.isDestroyed()) {
@@ -495,9 +558,11 @@ async function main() {
 
   // Ctrl+C in the terminal: let the last history / dataset lines reach the disk (at most 2 s), then
   // quit normally so the window share, the worker and Tesseract are shut down too.
-  process.on("SIGINT", () => {
-    void Promise.race([Promise.all([tracker.flush(), salvage.flush(), dataset.flush()]), new Promise((r) => setTimeout(r, 2000))]).finally(() => app.quit());
-  });
+  // The tray menu's Quit does the same.
+  const quit = () => {
+    void Promise.race([Promise.all([tracker.flush(), salvage.flush(), dataset.flush(), sharer.flush()]), new Promise((r) => setTimeout(r, 2000))]).finally(() => app.quit());
+  };
+  process.on("SIGINT", quit);
 
   const engine = new Engine([
     warmOnScreens(worker, capture, tesseract),
@@ -507,13 +572,24 @@ async function main() {
     salvage,
   ]);
 
+  // Which UE_game.log to follow, looked for again every 5 s (see engine/findLog.ts): the game may
+  // start after the overlay, from another install, or write UE_game_2.log.
+  const logDirs = gameLogDirs(); // registry and Steam files: read once
+  let program: string | null = null;
+  let gameSince = 0;
+  const search = () => findLog({ override: process.env.TLI_LOG_DIR, chosen: settings.logPath, program, gameSince, dirs: logDirs });
+  let found = search();
+  console.log(`log file (${found?.by ?? "not found"}): ${found?.path ?? "-"}`);
+  logBy = found?.by ?? "not found";
+  shareSession();
+
   // Salvages from before the tool ran (old logs, and this session's log so far), once per log.
-  if (!demoMode) {
+  if (!demoMode && found) {
     state.notice = "Reading earlier game logs…";
     send();
     const t0 = Date.now();
     try {
-      const r = await scanLogsForSalvage(LOG_DIR, historyDir);
+      const r = await scanLogsForSalvage(dirname(found.path), historyDir);
       console.log(`log scan: ${r.added} new salvage batches (${r.memories} memories) in ${Date.now() - t0} ms`);
     } catch (err) {
       console.error(`log scan: ${err}`);
@@ -521,33 +597,176 @@ async function main() {
     state.notice = null;
     await recalibrate();
   }
-  let waitingForLog = false;
-  const tailer = new LogTailer(
-    join(LOG_DIR, "UE_game.log"),
-    (line) => {
-      if (waitingForLog) {
-        waitingForLog = false;
-        state.notice = null;
+  // Read the log written so far this game session for stack sizes only, so the first pickup of
+  // a stack already in the bag (Threads, Compasses) is counted after a restart.
+  const follow = async (path: string) => {
+    const t = new LogTailer(path, (line) => engine.feed(line), { fromEnd: true, prime: (line) => engine.prime(line) });
+    const t0 = Date.now();
+    await t.start();
+    console.log(`log read in ${Date.now() - t0} ms`);
+    return t;
+  };
+  let tailer = found ? await follow(found.path) : null;
+  send();
+
+  // The log notice is shown only while the game runs: the game creates UE_game.log on start, and
+  // only with logging on. A log that stays unchanged for 2 minutes of play is an old one left
+  // from before logging was turned off.
+  const LOG_NOTICE = "UE_game.log not found or not being written (in game: Settings → Other → Enable Log, or tray icon → Choose UE_game.log)";
+  let looking = false;
+  const lookAgain = async () => {
+    if (looking || win.isDestroyed()) return;
+    looking = true;
+    try {
+      const running = await gameRunning();
+      if (running && !gameSince) {
+        gameSince = Date.now();
+        program = await gameProgram(); // once per game start
+        console.log(`game started: ${program ?? "program not readable"}`);
+      } else if (!running) [gameSince, program] = [0, null];
+      const next = search();
+      if (next?.path !== found?.path) {
+        console.log(`log file (${next?.by ?? "not found"}): ${next?.path ?? "-"}`);
+        tailer?.stop();
+        found = next;
+        tailer = found ? await follow(found.path) : null;
+      }
+      const written = found ? await stat(found.path).then((s) => s.mtimeMs, () => 0) : 0;
+      const missing = running && (!written || (Date.now() - gameSince > STALE_MS && Date.now() - written > STALE_MS));
+      const notice = missing ? LOG_NOTICE : state.notice === LOG_NOTICE ? null : state.notice;
+      if (notice !== state.notice) {
+        state.notice = notice;
         send();
       }
-      engine.feed(line);
-    },
-    // Read the log written so far this game session for stack sizes only, so the first pickup of
-    // a stack already in the bag (Threads, Compasses) is counted after a restart.
-    { fromEnd: true, prime: (line) => engine.prime(line) },
-  );
-  const t0 = Date.now();
-  await tailer.start();
-  console.log(`log read in ${Date.now() - t0} ms`);
-  if (!tailer.hasFile) {
-    // The game creates the log on start, and only with logging on; keep polling until it appears.
-    waitingForLog = true;
-    state.notice = "Waiting for UE_game.log (in game: Settings → Other → Enable Log)";
+      refreshTray();
+    } finally {
+      looking = false;
+    }
+  };
+  const gamePoll = setInterval(() => void lookAgain(), 5000);
+
+  // The first-start question (panel), and the tray's switch.
+  const setSharing = async (on: boolean) => {
+    await sharer.setShare(on);
+    if (on) shareSession(); // this session's details, now that they may be sent
+    refreshShare();
+    state.status = on ? "Sharing anonymous data: thank you!" : "Not sharing data";
+    refreshTray();
+    send();
+  };
+  ipcMain.on("share", (_e, on: boolean) => void setSharing(!!on));
+
+  // Report a wrong read: the last frame (shrunk to fit the collector) and what was read from it,
+  // with the player's note. Sent only when the player presses Send, sharing on or off.
+  let reportWin: BrowserWindow | null = null;
+  let pending: { screen: string; read: Record<string, unknown> | null; image: Buffer } | null = null;
+  async function openReport() {
+    if (!sharer.available) return;
+    if (reportWin) return reportWin.focus();
+    const f = lastFrame;
+    if (!f || !existsSync(f.path)) {
+      state.status = "Nothing to report yet: the report takes the last Black Sail screen read";
+      showPanelFor(6000);
+      return send();
+    }
+    const full = nativeImage.createFromPath(f.path);
+    const img = full.getSize().width > 1600 ? full.resize({ width: 1600, quality: "good" }) : full;
+    let quality = 85;
+    let jpeg = img.toJPEG(quality);
+    while (jpeg.length > MAX_IMAGE && quality > 25) jpeg = img.toJPEG((quality -= 10));
+    if (jpeg.length > MAX_IMAGE) jpeg = img.resize({ width: 1000, quality: "good" }).toJPEG(60);
+    pending = { screen: f.screen, read: f.read, image: jpeg };
+    reportWin = new BrowserWindow({
+      width: 600,
+      height: 760,
+      title: "Report a wrong read",
+      autoHideMenuBar: true,
+      icon: resolve(import.meta.dirname, "icon.png"),
+      webPreferences: { preload: resolve(import.meta.dirname, "report-preload.cjs") },
+    });
+    reportWin.setAlwaysOnTop(true, "screen-saver"); // above the game and the overlay
+    reportWin.on("closed", () => {
+      reportWin = null;
+      pending = null;
+    });
+    await reportWin.loadFile(resolve(import.meta.dirname, "report.html"));
+    reportWin.webContents.send("report:init", {
+      image: `data:image/jpeg;base64,${jpeg.toString("base64")}`,
+      read: f.read ? JSON.stringify(f.read, null, 1) : "(nothing was read from this screen)",
+    });
   }
-  send();
+  ipcMain.on("report", () => void openReport());
+  ipcMain.handle("report:send", async (_e, text: string) => {
+    if (!pending) return "Nothing to send";
+    const err = await sharer.report({ ...pending, text: String(text ?? "").slice(0, 2000) });
+    if (!err) record("reported", { screen: pending.screen });
+    return err;
+  });
+  if (sharer.available && !globalShortcut.register("CommandOrControl+Shift+R", () => void openReport())) console.log("Ctrl+Shift+R is taken by another program");
+
+  // Tray icon: the overlay has no window of its own to close, so this is where it is controlled.
+  const tray = new Tray(nativeImage.createFromPath(resolve(import.meta.dirname, "icon.png")));
+  tray.setToolTip("TLI Overlay");
+  function refreshTray() {
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: found ? `Log: ${found.by}` : "Log: not found", enabled: false },
+        {
+          label: "Choose UE_game.log…",
+          click: async () => {
+            const res = await dialog.showOpenDialog({
+              title: "Choose UE_game.log",
+              defaultPath: found?.path,
+              properties: ["openFile"],
+              filters: [{ name: "Torchlight: Infinite log", extensions: ["log"] }],
+            });
+            if (res.canceled || !res.filePaths[0]) return;
+            settings.logPath = res.filePaths[0];
+            await saveSettings(settings);
+            await lookAgain();
+          },
+        },
+        ...(settings.logPath
+          ? [{ label: "Find the log automatically", click: async () => { settings.logPath = null; await saveSettings(settings); await lookAgain(); } }]
+          : []),
+        { type: "separator" },
+        ...(sharer.available
+          ? [
+              { label: "Share anonymous data", type: "checkbox" as const, checked: sharer.on, click: () => void setSharing(!sharer.on) },
+              { label: "Report a wrong read (Ctrl+Shift+R)", click: () => void openReport() },
+              {
+                label: "Show what was shared",
+                click: async () => {
+                  const out = join(USER_DIR, "shared-export.json");
+                  await sharer.exportShared(out);
+                  await shell.openPath(out);
+                },
+              },
+              {
+                label: "Delete my shared data",
+                click: async () => {
+                  const { response } = await dialog.showMessageBox({
+                    type: "question",
+                    buttons: ["Delete", "Cancel"],
+                    defaultId: 1,
+                    message: "Delete everything this PC shared (records and reports) from the collector?",
+                  });
+                  if (response !== 0) return;
+                  await dialog.showMessageBox({ message: await sharer.forget() });
+                },
+              },
+              { type: "separator" as const },
+            ]
+          : []),
+        { label: "Quit", click: quit },
+      ]),
+    );
+  }
+  refreshTray();
 
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", () => {
+    globalShortcut.unregisterAll();
     capture.dispose();
     worker.stop();
     void tesseract.stop();

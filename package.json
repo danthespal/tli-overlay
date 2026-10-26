@@ -12,6 +12,8 @@
     "watch": "tsx src/cli/watch.ts",
     "calibrate": "tsx src/cli/calibrate.ts",
     "backfill-salvage": "tsx src/cli/salvage.ts",
+    "pull": "tsx src/cli/pull.ts",
+    "reports": "tsx src/cli/reports.ts",
     "overlay": "electron src/overlay/start.mjs",
     "build-flame-icons": "tsx src/cli/build-flame-icons.ts",
     "test": "vitest run",

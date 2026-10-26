@@ -50,6 +50,11 @@
   .tier.C { background: #9aa0b4; } .tier.D { background: #5a6075; color: #ddd; }
   .score { font-size: 12px; margin-top: 3px; }
   .score b { color: var(--text); }
+  .consent { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #444a63; font-size: 13px; }
+  .consent .goals { margin-top: 6px; }
+  .link { pointer-events: auto; cursor: pointer; text-decoration: underline; }
+  .link:hover { color: var(--text); }
+  .notice { margin-top: 6px; font-size: 12px; color: var(--orange); }
 </style>
 </head>
 <body>
@@ -122,8 +127,10 @@
         html.push(`<div class="box flame ${f.confirmed ? "confirmed" : ""} ${f.kind ?? ""} ${f.best ? "bestflame" : ""}" style="${pos}; top:${f.y - 16}px">${tier(f.tier)}${f.best ? '<span class="rank">★ PUT IN</span>' : ""}${esc(f.label)}</div>`);
       }
     }
-    if (s.notice) html.push(`<div class="box" style="left:1560px; top:82px; width:330px; font-size:12px">Black Sail overlay: ${esc(s.notice)}</div>`);
-    if (s.screen !== "none" || s.showPanel) {
+    const panelShown = s.screen !== "none" || s.showPanel || s.share.ask;
+    // Same place as the panel: inside it when the panel is up.
+    if (s.notice && !panelShown) html.push(`<div class="box" style="left:1560px; top:82px; width:330px; font-size:12px">Black Sail overlay: ${esc(s.notice)}</div>`);
+    if (panelShown) {
       const picks = s.picks.map((p) => `<div class="pick"><span class="dot ${p.rarity ?? ""}"></span>${esc(p.label)}</div>`).join("");
       const goals = s.goals.map((g) => `<span class="goal ${g.id === s.goal ? "on" : ""}" data-goal="${esc(g.id)}">${esc(g.label)}</span>`).join("");
       const ask = s.askGoal ? '<div class="ask">New cycle: what do you farm?</div>' : "";
@@ -132,9 +139,18 @@
            <b>≈ ${s.lastChest.fe.toFixed(0)} FE</b> <span class="detail">(model ${s.lastChest.modelFe.toFixed(0)})</span></div>`
         : "";
       const set = s.setScore !== null && s.picks.length ? ` · set ×${s.setScore.toFixed(2)}` : "";
-      html.push(`<div class="box panel" id="panel"><h1>Black Sail · cycle ${s.cycle} · ${s.picks.length}/6${set}</h1>
+      // Asked once at first start; nothing is sent before the player answers yes.
+      const consent = s.share.ask
+        ? `<div class="consent"><b>Help improve the advisor?</b>
+           <div class="detail">Share anonymous Black Sail data: the cards offered, your picks, chest drops, what the overlay read and your screen size.
+           Never the game log, screenshots, your Steam ID or names. You can turn it off or delete it from the tray icon.</div>
+           <div class="goals"><span class="goal on" data-share="yes">Share</span><span class="goal" data-share="no">Don't share</span></div></div>`
+        : "";
+      const report = s.share.available ? `<div class="detail">Wrong read? <span class="link" data-report>Report it</span> (Ctrl+Shift+R)</div>` : "";
+      html.push(`<div class="box panel" id="panel">${consent}<h1>Black Sail · cycle ${s.cycle} · ${s.picks.length}/6${set}</h1>
         ${ask}<div class="goals">${goals}</div>
-        ${picks || '<div class="detail">no Whispers picked yet</div>'}${chest}<div class="status">${esc(s.status)}</div></div>`);
+        ${picks || '<div class="detail">no Whispers picked yet</div>'}${chest}<div class="status">${esc(s.status)}</div>
+        ${s.notice ? `<div class="notice">${esc(s.notice)}</div>` : ""}${report}</div>`);
     }
     stage.innerHTML = html.join("");
     // The main process makes the window clickable while the cursor is inside this box (screen
@@ -149,6 +165,9 @@
   stage.addEventListener("click", (e) => {
     const g = e.target.closest("[data-goal]");
     if (g) window.overlay.setGoal(g.dataset.goal);
+    const share = e.target.closest("[data-share]");
+    if (share) window.overlay.setShare(share.dataset.share === "yes");
+    if (e.target.closest("[data-report]")) window.overlay.report();
   });
   window.overlay.onBackground((url) => {
     document.body.style.background = `url("${url}") 0 0 / 1920px 1080px no-repeat`;

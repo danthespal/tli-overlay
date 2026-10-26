@@ -1,0 +1,54 @@
+# Pulls what players shared from the collector (worker/) into data/collected/, refits the advisor
+# on all of it (data/collected/advisor-config.json, summary.md) and commits that. Reports
+# (free text and pictures) are never committed: read them locally with `npm run reports`.
+# Runs every 6 hours, or on demand: gh workflow run collect.yml
+# Needs the repo secrets COLLECT_URL (the Worker's address) and COLLECT_TOKEN (its EXPORT_TOKEN).
+name: Collect
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The pull doesn't need Electron itself.
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+      - name: Pull new records and refit
+        env:
+          COLLECT_URL: ${{ secrets.COLLECT_URL }}
+          COLLECT_TOKEN: ${{ secrets.COLLECT_TOKEN }}
+        run: npm run pull
+
+      # Whatever was pulled is kept, even when the pull stopped partway.
+      - name: Commit
+        if: always()
+        run: |
+          git add data/collected
+          if git diff --cached --quiet; then
+            echo "No new records."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Collected data: $(head -3 data/collected/summary.md | tail -1 | cut -d. -f1)"
+          git push

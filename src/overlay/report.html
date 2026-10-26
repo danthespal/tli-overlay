@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Report a wrong read</title>
+<style>
+  :root { --bg: #14121f; --panel: #1e1b2e; --text: #eef0f6; --muted: #a9adc2; --good: #3ddc84; --bad: #ff7a7a; }
+  body { margin: 0; padding: 14px; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 16px; margin: 0 0 6px; }
+  p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  img { width: 100%; border-radius: 6px; display: block; background: #000; }
+  pre { background: var(--panel); border-radius: 6px; padding: 8px; font-size: 12px; max-height: 90px; overflow: auto; white-space: pre-wrap; margin: 8px 0; }
+  textarea { width: 100%; box-sizing: border-box; height: 70px; background: var(--panel); color: var(--text); border: 1px solid #444a63; border-radius: 6px; padding: 8px; font: inherit; resize: vertical; }
+  .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; }
+  .row span { flex: 1; font-size: 13px; }
+  button { font: inherit; padding: 6px 16px; border-radius: 6px; border: 1px solid #444a63; background: #2a2d40; color: var(--text); cursor: pointer; }
+  button.send { background: var(--good); color: #062; border-color: var(--good); font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .ok { color: var(--good); } .err { color: var(--bad); }
+</style>
+</head>
+<body>
+<h1>Report a wrong read</h1>
+<p>Sends this picture of the game screen and what the overlay read from it, with your note. Nothing else.</p>
+<img id="shot" alt="The game screen that will be sent">
+<pre id="read"></pre>
+<textarea id="text" maxlength="2000" placeholder="What's wrong? e.g. the middle card is Wonder, not Wealth"></textarea>
+<div class="row"><span id="status"></span><button id="cancel">Cancel</button><button id="send" class="send">Send</button></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  window.report.onInit(({ image, read }) => {
+    $("shot").src = image;
+    $("read").textContent = read;
+    $("text").focus();
+  });
+  $("cancel").onclick = () => window.close();
+  $("send").onclick = async () => {
+    $("send").disabled = true;
+    $("status").className = "";
+    $("status").textContent = "Sending…";
+    const err = await window.report.send($("text").value);
+    if (err) {
+      $("status").className = "err";
+      $("status").textContent = err;
+      $("send").disabled = false;
+      return;
+    }
+    $("status").className = "ok";
+    $("status").textContent = "Sent, thank you!";
+    setTimeout(() => window.close(), 1200);
+  };
+</script>
+</body>
+</html>

@@ -4,3 +4,9 @@ reports/
 data/dataset/
 data/history/
 release/
+data/settings.json
+data/share-queue.jsonl
+data/shared.jsonl
+data/shared-export.json
+data/reports/
+.env.collect

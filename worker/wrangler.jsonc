@@ -1,0 +1,14 @@
+// Every value here is safe to publish. The secrets (EXPORT_TOKEN, IP_SALT) are set with
+// `wrangler secret put` and live only in Cloudflare.
+{
+  "name": "tli-overlay-collector",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tli-overlay",
+      "database_id": "9933d25a-ccde-4d6a-bf60-3d97ab963559"
+    }
+  ]
+}

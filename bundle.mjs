@@ -16,4 +16,4 @@ await build({
   target: "node22",
   packages: "external",
 });
-for (const f of ["overlay.html", "preload.cjs", "capture.html", "capture-preload.cjs"]) await copyFile(`src/overlay/${f}`, `${out}/${f}`);
+for (const f of ["overlay.html", "preload.cjs", "capture.html", "capture-preload.cjs", "icon.png", "report.html", "report-preload.cjs"]) await copyFile(`src/overlay/${f}`, `${out}/${f}`);

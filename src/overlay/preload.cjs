@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld("overlay", {
   // The panel's box; the window takes clicks only while the cursor is inside it.
   setPanelRect: (rect) => ipcRenderer.send("panelRect", rect),
   setGoal: (goal) => ipcRenderer.send("goal", goal),
+  // The first-start question: share anonymous data or not.
+  setShare: (on) => ipcRenderer.send("share", on),
+  report: () => ipcRenderer.send("report"),
   // --demo only: show a saved screenshot behind the drawings.
   onBackground: (callback) => ipcRenderer.on("background", (_event, url) => callback(url)),
 });

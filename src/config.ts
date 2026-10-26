@@ -1,83 +1,17 @@
-// Game paths, found on any PC (Steam or the standalone launcher). Override with the TLI_LOG_DIR /
-// TLI_SCREENSHOT_DIR environment variables (other installs, development).
-import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+// Game paths, found on any PC (Steam or the standalone launcher, see engine/findLog.ts). Override
+// with the TLI_LOG_DIR / TLI_SCREENSHOT_DIR environment variables (other installs, development).
+// The overlay looks again while it runs (findLog); these are for the command-line tools.
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { findLog, gameLogDirs, steamRoots } from "./engine/findLog.js";
 
-const STEAM_APP = "1974050";
-
-function regQuery(key: string, value: string): string | null {
-  try {
-    const out = execFileSync("reg", ["query", key, "/v", value], { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
-    return new RegExp(`${value}\\s+REG_SZ\\s+(.+)`).exec(out)?.[1]?.trim() ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** Steam's folder(s) from the registry, plus its default install folder. */
-const steamRoots = [
-  ...new Set(
-    [
-      regQuery("HKCU\\Software\\Valve\\Steam", "SteamPath"),
-      regQuery("HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam", "InstallPath"),
-      regQuery("HKLM\\SOFTWARE\\Valve\\Steam", "InstallPath"),
-      "C:/Program Files (x86)/Steam",
-    ]
-      .filter((p): p is string => !!p)
-      .map((p) => p.replace(/\\/g, "/").toLowerCase()),
-  ),
-];
-const STEAM = steamRoots[0]!;
-
-/** Every Steam library folder (libraryfolders.vdf lists them as "path" "D:\\SteamLibrary"). */
-function steamLibraries(): string[] {
-  const libs = new Set(steamRoots);
-  for (const root of steamRoots) {
-    try {
-      const vdf = readFileSync(join(root, "steamapps/libraryfolders.vdf"), "utf8");
-      for (const m of vdf.matchAll(/"path"\s+"([^"]+)"/g)) libs.add(m[1]!.replace(/\\\\/g, "/").toLowerCase());
-    } catch {}
-  }
-  return [...libs];
-}
-
-/** Candidate log folders: each Steam library that has the game, then the standalone launcher's. */
-function logDirs(): string[] {
-  const dirs: string[] = [];
-  for (const lib of steamLibraries()) {
-    try {
-      const acf = readFileSync(join(lib, `steamapps/appmanifest_${STEAM_APP}.acf`), "utf8");
-      const dir = /"installdir"\s+"([^"]+)"/.exec(acf)?.[1];
-      if (dir) dirs.push(join(lib, "steamapps/common", dir, "UE_game/TorchLight/Saved/Logs"));
-    } catch {}
-  }
-  for (const base of ["C:/Program Files (x86)/Torchlight Infinite", "C:/Program Files/Torchlight Infinite"]) {
-    dirs.push(join(base, "Game/UE_game/TorchLight/Saved/Logs"));
-  }
-  // A game under Program Files that may not write there has its log in Windows' VirtualStore copy.
-  const store = process.env.LOCALAPPDATA;
-  for (const d of [...dirs]) if (store && /^[a-z]:[\\/]program files/i.test(d)) dirs.push(join(store, "VirtualStore", d.slice(3)));
-  return dirs;
-}
-
-function mtime(path: string): number {
-  try {
-    return statSync(path).mtimeMs;
-  } catch {
-    return -1;
-  }
-}
+const STEAM = steamRoots()[0]!;
 
 /** The folder with the newest UE_game.log; without any log yet, an installed game's folder. */
-export const LOG_DIR =
-  process.env.TLI_LOG_DIR ??
-  (() => {
-    const dirs = logDirs();
-    const newest = dirs.map((d) => ({ d, t: mtime(join(d, "UE_game.log")) })).sort((a, b) => b.t - a.t)[0];
-    if (newest && newest.t >= 0) return newest.d;
-    return dirs.find((d) => existsSync(join(d, "../.."))) ?? dirs[0]!;
-  })();
+export const LOG_DIR = process.env.TLI_LOG_DIR ?? (() => {
+  const found = findLog();
+  return found ? dirname(found.path) : gameLogDirs()[0]!;
+})();
 
 /** Steam F12 screenshots for Torchlight: Infinite (app 1974050), for the Steam user that has them. */
 export const SCREENSHOT_DIR =
