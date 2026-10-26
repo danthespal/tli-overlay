@@ -8,9 +8,13 @@ import { APP_DIR, PACKAGED, USER_DIR } from "../../paths.js";
 import type { EffectEntry, Rarity } from "./effects.js";
 import { MATERIALS, parseModifier, type Material, type Modifier } from "./modifiers.js";
 
-/** The shipped config. The exe calibrates a copy of it next to itself (ADVISOR_CONFIG). */
+/**
+ * The shipped config, fitted on all the data (npm run calibrate). The overlay keeps the player's
+ * copy (ADVISOR_CONFIG, in data/: next to the exe, or tool/data/ from source), rebuilt from the
+ * shipped one blended with the player's own history; it never rewrites the shipped one.
+ */
 export const DEFAULT_ADVISOR_CONFIG = join(APP_DIR, "data/black-sail/advisor-config.json");
-export const ADVISOR_CONFIG = PACKAGED ? join(USER_DIR, "advisor-config.json") : DEFAULT_ADVISOR_CONFIG;
+export const ADVISOR_CONFIG = join(USER_DIR, "advisor-config.json");
 export const PICKS_PER_CYCLE = 6;
 export const RARITIES: Rarity[] = ["white", "blue", "purple", "orange"];
 /** The table group of the card offered by the Switch button (always available, any screen). */
@@ -63,7 +67,8 @@ export interface AdvisorConfig {
   /** Hero Memory value from salvage: Thread prices by ConfigBaseId, and how many memories the fit needs. */
   salvage?: { threadPrices: Record<string, number>; minMemories: number };
   /** Written by `npm run calibrate`: what the numbers above were measured from. */
-  calibration?: { time: string; chests: number; screens: number; flames: number; salvaged?: number };
+  /** What the numbers were fitted on; `own` = the player's part when blended with the shipped fit. */
+  calibration?: { time: string; chests: number; screens: number; flames: number; salvaged?: number; own?: { chests: number; screens: number; flames: number; salvaged: number } };
 }
 
 /** The goal a cycle starts with (the player picks per cycle). "fe" (plain FE weights) is internal only, not offered. */

@@ -77,8 +77,8 @@ export function impliedBase(chest: ChestLike, cfg: AdvisorConfig): Partial<Recor
   return out;
 }
 
-/** Mean implied base over complete chests; materials without data keep the config value. */
-export function calibrateBase(chests: ChestLike[], cfg: AdvisorConfig): { baseAmount: Record<Material, number>; chests: number } {
+/** Mean implied base over complete chests; materials without data keep the config value. `counts`: chests per material. */
+export function calibrateBase(chests: ChestLike[], cfg: AdvisorConfig): { baseAmount: Record<Material, number>; chests: number; counts: Partial<Record<Material, number>> } {
   const used = chests.filter((c) => c.complete && !c.unread);
   const sums = {} as Partial<Record<Material, { total: number; n: number }>>;
   for (const chest of used) {
@@ -89,11 +89,15 @@ export function calibrateBase(chests: ChestLike[], cfg: AdvisorConfig): { baseAm
     }
   }
   const baseAmount = { ...cfg.baseAmount };
+  const counts: Partial<Record<Material, number>> = {};
   for (const mat of MATERIALS) {
     const s = sums[mat];
-    if (s?.n) baseAmount[mat] = +(s.total / s.n).toFixed(mat === "scraps" ? 0 : 1);
+    if (s?.n) {
+      baseAmount[mat] = +(s.total / s.n).toFixed(mat === "scraps" ? 0 : 1);
+      counts[mat] = s.n;
+    }
   }
-  return { baseAmount, chests: used.length };
+  return { baseAmount, chests: used.length, counts };
 }
 
 /** Flame effect id → the card it guarantees on the next screen. Loot flames guarantee nothing. */
@@ -163,22 +167,66 @@ export interface History {
   salvages?: SalvageLike[];
 }
 
-/** The config with every measurable number replaced by what the history says. */
-export function calibrate(cfg: AdvisorConfig, history: History, now = new Date()): AdvisorConfig {
+/** `v0` counted as `w` observations, plus `n` new ones averaging `v`. */
+const blend = (v0: number, w: number, v: number, n: number, digits: number) => (n ? +((v0 * w + v * n) / (w + n)).toFixed(digits) : v0);
+
+/**
+ * The config with every measurable number fitted to the history.
+ *
+ * Without `blended`: replaced by what the history says (the shipped fit, made from all the data).
+ * With `blended` (a player's copy): each number is the shipped fit, counted as the data it came
+ * from (its `calibration` counts), averaged with the player's own data. One new chest then nudges
+ * the numbers instead of replacing a fit made from dozens; a player who has played a lot ends up
+ * mostly on their own numbers. `cfg` should be the shipped config itself, so nothing counts twice.
+ */
+export function calibrate(cfg: AdvisorConfig, history: History, now = new Date(), blended = false): AdvisorConfig {
   const base = calibrateBase(history.chests, cfg);
   const prior = flamePrior(history.flames);
   const doubled = doubledRate(history.screens);
   const memory = memoryValue(history.salvages ?? [], cfg);
-  const enough = memory.memories >= (cfg.salvage?.minMemories ?? Infinity);
+  const own = { chests: base.chests, screens: doubled.count, flames: prior.count, salvaged: memory.memories };
+  if (!blended) {
+    const enough = memory.memories >= (cfg.salvage?.minMemories ?? Infinity);
+    return {
+      ...cfg,
+      weights: enough ? { ...cfg.weights, heroMemories: memory.fe } : cfg.weights,
+      baseAmount: base.baseAmount,
+      lookahead: {
+        ...cfg.lookahead,
+        flames: prior.count ? prior.flames : cfg.lookahead.flames,
+        doubledRate: doubled.count ? doubled.rate : cfg.lookahead.doubledRate,
+      },
+      calibration: { time: now.toISOString(), ...own },
+    };
+  }
+  const w = { chests: 0, screens: 0, flames: 0, salvaged: 0, ...cfg.calibration };
+  const baseAmount = { ...cfg.baseAmount };
+  for (const m of MATERIALS) baseAmount[m] = blend(cfg.baseAmount[m], w.chests, base.baseAmount[m], base.counts[m] ?? 0, m === "scraps" ? 0 : 1);
+  // Flame guarantees: per kind, the shipped share and the player's (0 where one side has none).
+  const key = (g: FlameGuarantee) => `${g.group}|${g.minRarity}`;
+  const flames = new Map<string, FlameGuarantee>();
+  for (const g of [...cfg.lookahead.flames, ...prior.flames]) flames.set(key(g), { ...g, p: 0 });
+  for (const g of flames.values()) {
+    const p0 = cfg.lookahead.flames.find((x) => key(x) === key(g))?.p ?? 0;
+    const p = prior.flames.find((x) => key(x) === key(g))?.p ?? 0;
+    g.p = blend(p0, w.flames, p, prior.count, 3);
+  }
   return {
     ...cfg,
-    weights: enough ? { ...cfg.weights, heroMemories: memory.fe } : cfg.weights,
-    baseAmount: base.baseAmount,
+    weights: { ...cfg.weights, heroMemories: blend(cfg.weights.heroMemories, w.salvaged ?? 0, memory.fe, memory.memories, 3) },
+    baseAmount,
     lookahead: {
       ...cfg.lookahead,
-      flames: prior.count ? prior.flames : cfg.lookahead.flames,
-      doubledRate: doubled.count ? doubled.rate : cfg.lookahead.doubledRate,
+      flames: [...flames.values()].filter((g) => g.p > 0),
+      doubledRate: blend(cfg.lookahead.doubledRate, w.screens, doubled.rate, doubled.count, 3),
     },
-    calibration: { time: now.toISOString(), chests: base.chests, screens: doubled.count, flames: prior.count, salvaged: memory.memories },
+    calibration: {
+      time: now.toISOString(),
+      chests: w.chests + own.chests,
+      screens: w.screens + own.screens,
+      flames: w.flames + own.flames,
+      salvaged: (w.salvaged ?? 0) + own.salvaged,
+      own,
+    },
   };
 }

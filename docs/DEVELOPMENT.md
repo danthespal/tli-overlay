@@ -27,7 +27,7 @@ npm run overlay -- --dataset      # keep every grabbed frame in data/dataset/<da
 npm run watch                     # same engine, text output in the terminal
 npm run watch -- --keep           # ...and keep each grabbed frame in reports/frames/
 npm run watch -- --once           # grab the game window now and read it (pipeline test)
-npm run calibrate                 # refit the advisor from data/history/ (the overlay does this by itself at start and after every chest / salvage; -- --dry to preview)
+npm run calibrate                 # refit the SHIPPED advisor config on data/history/ + the pulled shared records (-- --dry to preview)
 npm run backfill-salvage          # read Hero Memory salvages out of old logs into data/history/ (the overlay does this by itself at start)
 npm run pull                      # pull shared records from the collector and refit on them (COLLECT_URL, COLLECT_TOKEN)
 npm run reports                   # download "wrong read" reports into data/reports/
@@ -106,7 +106,7 @@ src/
       modifiers.ts           effect text -> structured modifier (8 kinds)
       advisor.ts             6-card combo value + ranked advice with look-ahead (flame prior, doubled rate, ties)
       calibrate.ts           fits base amounts / flame prior / doubled rate / Hero Memory value from the history files
-      autoCalibrate.ts       runs that fit inside the overlay and saves the config (no user action)
+      autoCalibrate.ts       the player's copy: the shipped fit blended with their own history (each value weighted by how much data each side has), refit after every chest / salvage
       salvageTracker.ts      records Hero Memory salvages (ExchangeItem batches) and scans old logs for them
       pickTracker.ts         cycle picks, history file (data/history/)
   overlay/         Electron main process, the overlay page, the report window

@@ -12,3 +12,5 @@ data/reports/
 .env.collect
 data/collected/raw/
 data/collected/state.json
+data/advisor-config.json
+data/advisor-config.json.tmp
