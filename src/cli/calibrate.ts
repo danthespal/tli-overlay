@@ -23,7 +23,12 @@ async function collected(): Promise<Map<string, unknown[]>> {
   const byKind = new Map<string, unknown[]>();
   const files = (await readdir(COLLECTED).catch(() => [] as string[])).filter((f) => f.endsWith(".jsonl"));
   for (const f of files) {
-    for (const row of await jsonl<{ kind: string; data: unknown }>(join(COLLECTED, f))) byKind.set(row.kind, [...(byKind.get(row.kind) ?? []), row.data]);
+    // Pushed in place: copying the list per record would be quadratic (100k records: ~5e9 copies).
+    for (const row of await jsonl<{ kind: string; data: unknown }>(join(COLLECTED, f))) {
+      const list = byKind.get(row.kind);
+      if (list) list.push(row.data);
+      else byKind.set(row.kind, [row.data]);
+    }
   }
   return byKind;
 }

@@ -280,7 +280,11 @@ async function main() {
     if (key !== healthKey) {
       healthKey = key;
       showUntil = now + 8000;
-      tooltip = `TLI Overlay · ${ready ? "Ready to play" : problem ?? (running ? "Starting…" : "Game not running")}${note ? `\n${note}` : ""}`;
+    }
+    // Updated whenever its text changes (a note can change while the lights don't).
+    const tip = `TLI Overlay · ${ready ? "Ready to play" : problem ?? (running ? "Starting…" : "Game not running")}${note ? `\n${note}` : ""}`;
+    if (tip !== tooltip) {
+      tooltip = tip;
       tray?.setToolTip(tooltip);
     }
     // Few forced starts left: the warning stays up for the first minute of play.
@@ -809,30 +813,34 @@ async function main() {
     while (jpeg.length > MAX_IMAGE && quality > 25) jpeg = img.toJPEG((quality -= 10));
     if (jpeg.length > MAX_IMAGE) jpeg = img.resize({ width: 1000, quality: "good" }).toJPEG(60);
     pending = { screen: f.screen, read: f.read, image: jpeg };
-    reportWin = new BrowserWindow({
+    const w = (reportWin = new BrowserWindow({
       width: 600,
       height: 760,
       title: "Report a wrong read",
       autoHideMenuBar: true,
       icon: resolve(import.meta.dirname, "icon.png"),
       webPreferences: { preload: resolve(import.meta.dirname, "report-preload.cjs") },
-    });
-    reportWin.setAlwaysOnTop(true, "screen-saver"); // above the game and the overlay
-    reportWin.on("closed", () => {
+    }));
+    w.setAlwaysOnTop(true, "screen-saver"); // above the game and the overlay
+    w.on("closed", () => {
       reportWin = null;
       pending = null;
     });
-    await reportWin.loadFile(resolve(import.meta.dirname, "report.html"));
-    reportWin.webContents.send("report:init", {
+    await w.loadFile(resolve(import.meta.dirname, "report.html")).catch(() => undefined);
+    // Closed while it loaded: nothing to fill in.
+    if (w.isDestroyed()) return;
+    w.webContents.send("report:init", {
       image: `data:image/jpeg;base64,${jpeg.toString("base64")}`,
       read: f.read ? JSON.stringify(f.read, null, 1) : "(nothing was read from this screen)",
     });
   }
   ipcMain.on("report", () => void openReport());
   ipcMain.handle("report:send", async (_e, text: string) => {
-    if (!pending) return "Nothing to send";
-    const err = await sharer.report({ ...pending, text: String(text ?? "").slice(0, 2000) });
-    if (!err) record("reported", { screen: pending.screen });
+    // Kept here: closing the window while it sends clears `pending`.
+    const report = pending;
+    if (!report) return "Nothing to send";
+    const err = await sharer.report({ ...report, text: String(text ?? "").slice(0, 2000) });
+    if (!err) record("reported", { screen: report.screen });
     return err;
   });
   if (sharer.available && !globalShortcut.register("CommandOrControl+Shift+R", () => void openReport())) console.log("Ctrl+Shift+R is taken by another program");

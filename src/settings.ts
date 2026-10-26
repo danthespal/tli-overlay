@@ -23,9 +23,23 @@ export async function loadSettings(file = SETTINGS_FILE): Promise<Settings> {
   }
 }
 
-/** Temp file + rename, like the other state files. */
-export async function saveSettings(settings: Settings, file = SETTINGS_FILE): Promise<void> {
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(`${file}.tmp`, JSON.stringify(settings, null, 2) + "\n");
-  await rename(`${file}.tmp`, file);
+/** Saves in flight, per file: two at once would share the temp file and one rename would fail. */
+const saving = new Map<string, Promise<void>>();
+
+/**
+ * Temp file + rename, like the other state files. Saves of the same file run one after another
+ * (a first "Share" click saves twice at once: the new install id, then the answer), each writing
+ * the settings as they are when its turn comes.
+ */
+export function saveSettings(settings: Settings, file = SETTINGS_FILE): Promise<void> {
+  const write = async () => {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(`${file}.tmp`, JSON.stringify(settings, null, 2) + "\n");
+    await rename(`${file}.tmp`, file);
+  };
+  const next = (saving.get(file) ?? Promise.resolve()).catch(() => undefined).then(write);
+  saving.set(file, next);
+  // Drop the entry once the last queued save is done (no growing map).
+  void next.finally(() => saving.get(file) === next && saving.delete(file)).catch(() => undefined);
+  return next;
 }
