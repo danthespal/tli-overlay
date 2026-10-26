@@ -217,10 +217,24 @@ export class TesseractOcr {
       const langPath = this.opts.langPath ?? TESSDATA;
       const make = async () => {
         const w = await createWorker(this.opts.lang ?? "eng", 1, { langPath, cachePath: langPath, cacheMethod: "readOnly", gzip: true, logger: () => undefined });
-        await w.setParameters({ preserve_interword_spaces: "1" });
+        try {
+          await w.setParameters({ preserve_interword_spaces: "1" });
+        } catch (err) {
+          await w.terminate().catch(() => undefined);
+          throw err;
+        }
         return w;
       };
-      for (const w of await Promise.all(Array.from({ length: this.opts.workers ?? 3 }, make))) scheduler.addWorker(w);
+      // All or none: when one engine fails to start, the ones that did are stopped (not left
+      // running unseen, holding their memory) before the failure is passed on.
+      const made = await Promise.allSettled(Array.from({ length: this.opts.workers ?? 3 }, make));
+      const workers = made.flatMap((m) => (m.status === "fulfilled" ? [m.value] : []));
+      const failed = made.find((m): m is PromiseRejectedResult => m.status === "rejected");
+      if (failed) {
+        await Promise.all(workers.map((w) => w.terminate().catch(() => undefined)));
+        throw failed.reason;
+      }
+      for (const w of workers) scheduler.addWorker(w);
       return scheduler;
     })();
     // A failed start (model file locked, out of memory) must not stay cached: the next read retries.

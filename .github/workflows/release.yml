@@ -1,5 +1,6 @@
-# Push a tag like v0.2.0 (matching "version" in package.json) to build the portable exe and
-# publish it, zipped, as a GitHub Release.
+# Push a tag like v0.2.0 (matching "version" in package.json) to build the app and publish it as
+# a GitHub Release: one zip of the app folder (unzip once, run TLI Overlay.exe; it starts at once,
+# unlike a single-file exe that unpacks itself on every launch).
 name: Release
 
 on:
@@ -23,12 +24,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run dist
-
-      - name: Zip the exe
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem release/*.exe | Select-Object -First 1
-          Compress-Archive -Path $exe.FullName -DestinationPath "release/$($exe.BaseName).zip"
 
       - name: Publish the release
         shell: pwsh

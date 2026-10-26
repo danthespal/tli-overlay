@@ -14,27 +14,38 @@ export class Engine {
   constructor(
     readonly modules: ToolModule[],
     onZoneEnd?: (visit: ZoneVisit) => void,
+    /** A module threw: told here, and the other modules still get the line (default: console.error). */
+    private readonly onError: (module: ToolModule, err: unknown) => void = (m, err) => console.error(`[${m.id}] ${err instanceof Error ? err.stack : err}`),
   ) {
     this.session = new SessionTracker(
       (visit) => {
         onZoneEnd?.(visit);
-        for (const m of modules) m.onZoneEnd?.(visit);
+        this.each((m) => m.onZoneEnd?.(visit));
       },
-      (batch) => {
-        for (const m of modules) m.onBatch?.(batch);
-      },
+      (batch) => this.each((m) => m.onBatch?.(batch)),
     );
+  }
+
+  /** Calls every module; one that throws doesn't stop the others. */
+  private each(call: (m: ToolModule) => void): void {
+    for (const m of this.modules) {
+      try {
+        call(m);
+      } catch (err) {
+        this.onError(m, err);
+      }
+    }
   }
 
   feed(line: LogLine): void {
     this.lastLine = line.lineNo;
     if (line.time !== undefined) this.lastTime = line.time;
-    for (const m of this.modules) m.onLine?.(line);
+    this.each((m) => m.onLine?.(line));
 
     const event = extractEvent(line);
     if (!event) return;
     this.session.handle(event);
-    for (const m of this.modules) m.onEvent?.(event);
+    this.each((m) => m.onEvent?.(event));
   }
 
   /** Older lines (log written before the tool started): stack sizes only, nothing reaches modules. */

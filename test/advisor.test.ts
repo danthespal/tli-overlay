@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { parseLogLine } from "../src/engine/logLine.js";
-import { configForGoal, evaluate, loadAdvisorConfig, recommend, setScore, tierOf, type AdvisorConfig } from "../src/modules/black-sail/advisor.js";
+import { configForGoal, DEFAULT_GOAL, evaluate, loadAdvisorConfig, recommend, setScore, tierOf, type AdvisorConfig } from "../src/modules/black-sail/advisor.js";
 import { flameTier } from "../src/modules/black-sail/flameReader.js";
 import { loadEffectTable, type EffectEntry } from "../src/modules/black-sail/effects.js";
 import { parseModifier } from "../src/modules/black-sail/modifiers.js";
@@ -111,6 +111,15 @@ describe("PickTracker", () => {
     const again = new PickTracker({ table, config: cfg, historyDir: dir, onEvent: () => {} });
     await again.load();
     expect(again.currentPicks.map((p) => p.effect)).toEqual([INVITE]);
+  });
+
+  it("a saved goal no longer offered (Best FE) falls back to the default; Best FE isn't offered", async () => {
+    expect(cfg.goals.list.map((g) => g.id)).not.toContain("fe");
+    await writeFile(join(dir, "black-sail-state.json"), JSON.stringify({ cycle: 3, picks: [], goal: "fe" }));
+    const old = new PickTracker({ table, config: cfg, historyDir: dir, onEvent: () => {} });
+    await old.load();
+    expect(old.goal).toBe(DEFAULT_GOAL);
+    expect(cfg.goals.list.map((g) => g.id)).toContain(DEFAULT_GOAL);
   });
 
   it("flags an ambiguous pick (two cards of the same rarity) and assumes the advised one", async () => {

@@ -108,6 +108,20 @@ describe("SealWhisperWatcher", () => {
     expect(events).toEqual([{ kind: "closed" }]);
   });
 
+  it("hands back the frame of a grab the screen closed during (no file left behind)", async () => {
+    const done = vi.fn(async () => {});
+    let finishGrab!: () => void;
+    const slow = vi.fn(() => new Promise<{ ok: true; file: string; width: number; height: number }>((r) => (finishGrab = () => r({ ok: true, file: "late.jpg", width: 1920, height: 1080 }))));
+    watcher = new SealWhisperWatcher({ grab: slow, ocr: async () => [THREE], done, table, onEvent: (e) => events.push(e), settleMs: { open: 1000, switch: 500, retry: 500 } });
+    feed(OPEN);
+    await vi.advanceTimersByTimeAsync(1000); // grab started
+    feed(CLOSE); // ... and the screen closes before it returns
+    finishGrab();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(done).toHaveBeenCalledWith("late.jpg");
+    expect(events.map((e) => e.kind)).toEqual(["closed"]);
+  });
+
   it("tries once more when the first frame has no cards yet (still animating)", async () => {
     pages = [EMPTY, THREE];
     feed(OPEN);

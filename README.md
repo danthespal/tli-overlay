@@ -1,96 +1,136 @@
-# tli-overlay (tool)
+<div align="center">
 
-TypeScript tool that reads Torchlight: Infinite's `UE_game.log`. It will later run inside an Electron overlay.
-It is read-only: it never touches game memory, files or input.
+<img src="docs/images/logo.svg" width="96" alt="TLI Overlay logo">
 
-## Setup
+# TLI Overlay
 
-In game: **Settings → Other → Enable Log**. Then:
+**Black Sail advice for Torchlight: Infinite, right on top of your game.**
 
-```bash
-npm install
-npm test          # unit tests (real log lines)
-npm run audit     # audit every UE_game*.log in the game's Logs folder
-npm run audit -- "path/to/UE_game.log"
-npm run read-cards                # read Seal Whisper cards from the saved sample screenshots
-npm run read-cards -- shot.jpg    # ...or from any screenshot
-npm run read-flames               # read the anchor (flame) screen from the saved samples
-npm run build-flame-icons         # rebuild flame icon references from samples/screens/anchor/labels.json
-npm run overlay                   # transparent click-through overlay over the game (advice badges, flame labels, cycle)
-npm run overlay -- --demo shot.jpg out.png   # draw the overlay over a saved screenshot (no game needed)
-npm run overlay -- --dataset      # development: keep every grabbed frame in data/dataset/<date>/frames/ (by default a frame is read and deleted; what was read always goes to data/dataset/<date>/events.jsonl)
-npm run watch                     # same engine, text output in the terminal
-npm run watch -- --keep           # ...and keep each grabbed frame in reports/frames/
-npm run watch -- --once           # grab the game window now and read it (pipeline test)
-npm run calibrate                 # development: refit the advisor from data/history/ (the overlay does this by itself at start and after every chest / salvage; -- --dry to preview)
-npm run backfill-salvage          # development: read Hero Memory salvages out of old logs into data/history/ (the overlay does this by itself at start)
+Pick the best Seal Whisper, put in the right flame, and see what your chest is worth: without alt-tabbing.
+
+![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white) ![Torchlight: Infinite](https://img.shields.io/badge/Torchlight%3A%20Infinite-Black%20Sail-f0b030) ![License: MIT](https://img.shields.io/badge/license-MIT-3ddc84)
+
+<img src="docs/images/cards.jpg" alt="TLI Overlay on the Seal Whisper screen: each card is ranked, the best one is marked, and the panel shows the current cycle" width="100%">
+
+</div>
+
+## ✨ What it does
+
+- 🃏 **Ranks every Seal Whisper card.** Each card gets a tier (S to D), a rank and a short reason. The best pick for your whole 6-card set is marked **★ BEST**.
+- 🔁 **Tells you if Switch is worth it.** Before you press Switch: the chance it beats your best card. After: whether the Switch card is better or worse.
+- 🔥 **Labels the flames.** On the Void Sea Seal screen every flame is named, and the one to put in is marked **★ PUT IN**.
+- 🎯 **Farms what you want.** Choose Scraps, Threads, Memories or Invites for each cycle, and the advice follows.
+- 📦 **Checks your chests.** After each Void Sea Treasure it shows what you got against what was expected.
+- 📈 **Learns from your play.** It calibrates itself from your own chests and salvages. Nothing to set up.
+
+<div align="center">
+<img src="docs/images/flames.jpg" alt="The flame screen: every flame is labelled and the best one is marked PUT IN" width="100%">
+</div>
+
+## 📥 Download and install
+
+1. Download **`TLI-Overlay-<version>-win-x64.zip`** from the [latest release](https://github.com/danthespal/tli-overlay/releases/latest).
+2. Unzip it into a folder of your choice (for example `Documents\TLI Overlay`).
+3. Run **`TLI Overlay.exe`**.
+
+> [!NOTE]
+> Windows may say *"Windows protected your PC"*, because the app isn't signed. Click **More info → Run anyway**.
+
+No installer, no admin rights. Your data stays in a `data` folder next to the exe. To update, unzip the new version over the old one, or move your `data` folder across.
+
+## 🎮 Before you play: turn on the game's log
+
+The overlay knows what's on screen by reading the game's own log. The game only writes the lines it needs when its log is turned on:
+
+1. In game, press **Esc → Settings → Other**.
+2. Under **Account Related**, click **Enable Log**. The game shows *"Log Enabled"*.
+3. **Log out and back in** (Return to login screen).
+
+> [!IMPORTANT]
+> The game doesn't remember this setting. After you close it, press **Enable Log** again the next time you play. The overlay tells you when it's needed.
+
+## 🚦 Ready to play?
+
+When you start the game, a small card in the top-right corner shows two lights:
+
+<div align="center">
+<img src="docs/images/status.png" alt="The status card: ready to play, starting, and Enable Log off" width="100%">
+</div>
+
+| Light | 🟢 Green | 🟡 Amber | 🔴 Red |
+|---|---|---|---|
+| **Game** | The game window was found | Looking for the game | — |
+| **Log** | The game's log is on | Checking (up to 2 minutes) | Turn on Enable Log (the card says how) |
+
+When both are green it says **✓ Ready to play** and gets out of your way. Open a Black Sail screen and the advice appears by itself.
+
+The overlay is click-through: your clicks go to the game, except on the panel itself.
+
+## 🧭 The tray icon
+
+Right-click the sail icon next to the clock:
+
+- **Choose UE_game.log…** if your game is installed somewhere unusual (normally it's found by itself)
+- **Share anonymous data** on or off
+- **Report a wrong read** (or press **Ctrl+Shift+R** in game)
+- **Show what was shared** and **Delete my shared data**
+- **Quit**
+
+## 🔒 Safe and private
+
+- **Read-only.** It never touches game memory, your keyboard or mouse, or the game's files. It only reads the game's log, and takes a picture of the game window when a Black Sail screen opens.
+- **Pictures are thrown away** as soon as they're read. Only the last one is kept, in your temp folder, so you can report it if it was read wrong.
+- **Sharing is your choice.** At first start it asks once whether to share anonymous Black Sail data (cards offered, picks, chest drops, what was read, screen size) to improve the advice for everyone. Never the game log, screenshots, your Steam ID or names. Nothing is sent unless you say yes, and you can turn it off or delete what you shared at any time.
+- **Reports are separate.** *Report a wrong read* shows you the picture and what was read, and sends them only when you press **Send**.
+
+## ❓ Troubleshooting
+
+<details>
+<summary><b>The Log light stays red</b></summary>
+
+Turn on the game's log (Esc → Settings → Other → Enable Log), then log out and back in. If it's on and still red, the game may be writing its log somewhere else: use the tray icon → **Choose UE_game.log…** and pick `UE_game\TorchLight\Saved\Logs\UE_game.log` in your game folder.
+</details>
+
+<details>
+<summary><b>I don't see the overlay over the game</b></summary>
+
+Use **borderless** or **windowed** mode in the game's graphics settings: Windows doesn't draw other windows over exclusive fullscreen.
+</details>
+
+<details>
+<summary><b>A card or flame was read wrong</b></summary>
+
+Press **Ctrl+Shift+R** right after, say what's wrong, and press **Send**. Those reports are how the reader gets better.
+</details>
+
+<details>
+<summary><b>The game runs as administrator</b></summary>
+
+Windows then won't let other apps share the game window, so the overlay falls back to a plain screen picture, which only works while the game is in front. Start the game normally, or run the overlay as administrator too (right-click → Run as administrator).
+</details>
+
+<details>
+<summary><b>How do I uninstall it?</b></summary>
+
+Quit it from the tray icon and delete its folder. Windows also keeps a small cache for it (about 8 MB) in `%APPDATA%\tli-overlay`, which you can delete too. Nothing else is installed.
+</details>
+
+## ⚙️ How it works
+
+```mermaid
+flowchart LR
+    A["UE_game.log<br/>(the game's log)"] -->|a Black Sail screen opens| B["One picture of<br/>the game window"]
+    B --> C["Text reader<br/>(cards, flames)"]
+    C --> D["Advisor<br/>(your goal, your set so far)"]
+    D --> E["Advice drawn<br/>over the game"]
+    A -->|chests, salvages| F["Your history"]
+    F -->|calibrates| D
 ```
 
-The watcher grabs **one frame only when the log says a choice screen opened, a flame was clicked, a card was clicked, or Switch was pressed**. Nothing is captured at any other time. Frames come from a **share of the game window** (Electron window capture, like tartarus-simulator): the game's own pixels, so nothing drawn on top is in the picture and the game needn't be in front. The share is started when a choice screen opens and stopped 20 s after the last frame (`src/capture/gameCapture.ts`, hidden page `src/overlay/capture.html`); a warm frame takes ~30 ms. When Windows won't share the window (e.g. the game runs elevated and the overlay doesn't), the fallback is a screen copy of the client area, which needs the game in front. Text is read by **Tesseract.js** (WebAssembly; the English model ships in `data/tessdata-fast`, so no Windows language pack is needed): per-card crops upscaled 2x, raw and binarised, three engines in parallel, ~0.8 s per card screen, ~0.4 s per flame screen (`src/ocr/tesseractOcr.ts`). `TLI_OCR=windows` switches back to Windows OCR for comparison. Window rectangles and the fallback copy run in one PowerShell helper (`scripts/worker.ps1`) with the same start/stop. `npm run overlay -- --hide-from-captures` content-protects the overlay window (out of screenshots and streams); off by default because on a transparent window it can leave the overlay undrawn. `npm run overlay -- --probe-capture <dir>` saves one frame of each kind with the game running.
+Want to build it yourself or help? See **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
-The overlay finds `UE_game.log` itself (`src/engine/findLog.ts`): beside the running game, else the newest log in every Steam library that has the game, the standalone launcher's folder and their VirtualStore copies. It looks again every 5 s and moves to another log when the game stops writing the current one. While the game runs and no log is being written, the panel says to turn on Settings → Other → Enable Log. The tray icon can also pick a log by hand; `TLI_LOG_DIR` overrides everything.
-Audit reports go to `reports/` (JSON + Markdown).
+## 📄 License
 
-## Data sharing
+[MIT](LICENSE) © 2026 Arsenic
 
-At first start the panel asks once whether to share anonymous Black Sail data. Nothing is sent before the player says yes. What is sent: the cards offered, picks, flames, chest drops, what was read, why frames weren't read, the game's size and how frames were taken, with a random install id and the app version (`src/share/`). Never the game log, screenshots, the Steam id or names. The tray icon turns it off, shows what was shared, or deletes it from the collector.
-
-**Report a wrong read** (Ctrl+Shift+R, or the panel's link) is separate: it shows the last frame and what was read, and sends them with the player's note only when they press Send.
-
-The collector is a Cloudflare Worker (`worker/`, setup in its README). `.github/workflows/collect.yml` pulls the records into `data/collected/` every 6 hours and refits the advisor on them; `npm run reports` downloads the reports locally.
-
-## Release
-
-`npm run dist` builds a single portable exe in `release/`. Pushing a tag such as `v0.2.0` (same as `version` in `package.json`) makes the GitHub Action build it and publish it, zipped, as a Release.
-The exe keeps the player's files (history, dataset, calibrated advisor config) in a `data` folder next to itself.
-
-## Layout
-
-```
-src/
-  engine/
-    logLine.ts     parse one line (time, category, text)
-    logReader.ts   readLogLines() for whole files, LogTailer for live follow + rotation
-    events.ts      typed events: mapEnter, mapModifier, itemChange, bag*, monsterCreated
-    session.ts     zone visits + loot deltas per zone, item batches with stack deltas
-    module.ts      ToolModule interface every mechanic implements
-    engine.ts      lines -> events -> session -> modules
-  capture/
-    gameCapture.ts window share of the game (Electron desktopCapturer) with a hidden capture page
-    worker.ts      client of scripts/worker.ps1: OCR, window rects and the screen-copy fallback
-    windowCapture.ts one-shot grab (CLI tools)
-  ocr/
-    tesseractOcr.ts Tesseract.js reader: per-screen crops, pixel statistics in JS, same OcrPage as windowsOcr
-    windowsOcr.ts  one-shot Windows OCR via scripts/ocr/windows-ocr.ps1 (comparison, CLI tools, tests)
-  modules/
-    black-sail/
-      index.ts               Plane Anchor maps, anchor/seal screens, Whisper rarity picks (log)
-      effects.ts             Seal Whisper effect table + matching OCR text to it
-      sealWhisperReader.ts   reads the 3 cards / Switch card from an OCR'd screenshot
-      flameReader.ts         reads the anchor (flame) screen: icons + selected flame text
-      modifiers.ts           effect text -> structured modifier (8 kinds)
-      advisor.ts             6-card combo value + ranked advice with look-ahead (flame prior, doubled rate, ties)
-      calibrate.ts           fits base amounts / flame prior / doubled rate / Hero Memory value from the history files
-      autoCalibrate.ts       runs that fit inside the overlay and saves the config (no user action)
-      salvageTracker.ts      records Hero Memory salvages (ExchangeItem batches) and scans old logs for them
-      pickTracker.ts         cycle picks, history file (data/history/)
-  cli/audit.ts     log investigation report
-  cli/read-cards.ts  Seal Whisper card reader on screenshots
-test/              vitest
-scripts/tli-lib.ps1  the grab and OCR code (C# pixel helpers, Windows.Media.Ocr), shared by:
-scripts/worker.ps1   the warm helper (JSON lines over stdin/stdout)
-scripts/capture/     capture-window.ps1, one grab per process
-scripts/ocr/         windows-ocr.ps1, one OCR run per process; plus the scripts that turned the
-                     Seal Whisper handbook screenshots into a table
-```
-
-## Adding a mechanic module
-
-Implement `ToolModule` (`onLine` / `onEvent` / `onZoneEnd` / `summary`) in `src/modules/<name>/`, then pass it to `new Engine([...])`.
-Patterns that only one mechanic cares about live in that module's `onLine`. Patterns several modules need get promoted to typed events in `engine/events.ts`.
-
-## Not built yet
-
-- Electron overlay window (next step)
-- Item names (we only have `ConfigBaseId`s; FE = 100300)
-- Prices
+*TLI Overlay is a fan-made tool. It isn't affiliated with or endorsed by XD Inc. or the makers of Torchlight: Infinite. Game names and images belong to their owners.*

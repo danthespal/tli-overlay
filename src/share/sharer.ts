@@ -69,12 +69,8 @@ export class Sharer {
   }
 
   async load(): Promise<void> {
-    try {
-      const lines = (await readFile(this.queueFile, "utf8")).split("\n").filter(Boolean);
-      this.queue = lines.map((l) => cleanRecord(JSON.parse(l))).filter((r) => r !== null);
-    } catch {
-      this.queue = [];
-    }
+    // Line by line: one line cut off by a crash mid-append must not drop the rest of the queue.
+    this.queue = (await this.readLines(this.queueFile)).map((r) => cleanRecord(r)).filter((r) => r !== null);
     if (this.on && this.queue.length) this.schedule(this.o.delayMs ?? 20_000);
   }
 
@@ -151,6 +147,20 @@ export class Sharer {
     }
   }
 
+  /** The JSON lines of a file; a missing file is empty, an unreadable (cut-off) line is skipped. */
+  private async readLines(file: string): Promise<unknown[]> {
+    const out: unknown[] = [];
+    for (const l of (await readFile(file, "utf8").catch(() => "")).split("\n")) {
+      if (!l.trim()) continue;
+      try {
+        out.push(JSON.parse(l));
+      } catch {
+        /* cut-off line */
+      }
+    }
+    return out;
+  }
+
   private async append(file: string, records: ShareRecord[]) {
     await mkdir(this.o.dir, { recursive: true });
     await appendFile(file, records.map((r) => JSON.stringify(r) + "\n").join(""));
@@ -176,8 +186,7 @@ export class Sharer {
 
   /** Writes what this install shared (the last KEEP_SENT records) to a JSON file the player can open. */
   async exportShared(file: string): Promise<number> {
-    const lines = (await readFile(this.sentFile, "utf8").catch(() => "")).split("\n").filter(Boolean);
-    const records = lines.map((l) => JSON.parse(l) as ShareRecord);
+    const records = (await this.readLines(this.sentFile)) as ShareRecord[];
     await writeFile(file, JSON.stringify({ about: "What this TLI Overlay shared with its collector (the latest records).", install: this.install, records }, null, 2));
     return records.length;
   }

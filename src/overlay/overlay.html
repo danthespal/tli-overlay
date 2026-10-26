@@ -5,56 +5,103 @@
 <title>TLI overlay</title>
 <style>
   :root {
-    --white: #c8d2dc; --blue: #4f7fe0; --purple: #b04fe0; --orange: #f0b030;
-    --good: #3ddc84; --panel: rgba(12, 10, 24, 0.82); --text: #eef0f6; --muted: #a9adc2;
+    --white: #c8d2dc; --blue: #5b8cf0; --purple: #b866f0; --orange: #f5b13d;
+    --gold: #f0b030; --good: #3ddc84; --warn: #f5a623; --bad: #ff5d5d; --off: #6b7088;
+    --surface: rgba(14, 12, 26, 0.92); --surface-2: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.09); --text: #f1f2f8; --muted: #a3a8c0; --faint: #70758f;
   }
   html, body { margin: 0; background: transparent; overflow: hidden; pointer-events: none;
-    font-family: "Segoe UI", system-ui, sans-serif; color: var(--text); }
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--text);
+    -webkit-font-smoothing: antialiased; }
   /* Positioned over the game client area; children use 1920x1080 coordinates. */
   #stage { position: absolute; width: 1920px; height: 1080px; transform-origin: 0 0; }
-  .box { position: absolute; background: var(--panel); border-radius: 8px; padding: 8px 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); font-size: 15px; line-height: 1.3; }
-  .card { width: 300px; border-left: 5px solid var(--white); }
-  .box.best { outline: 2px solid var(--good); }
-  .rank { display: inline-block; font-weight: 700; font-size: 13px; padding: 1px 7px; border-radius: 10px;
-    background: #444a63; margin-right: 6px; }
-  .best .rank { background: var(--good); color: #062; }
-  .label { font-weight: 600; }
-  .detail { font-size: 12px; color: var(--muted); }
-  .flame { font-size: 14px; padding: 4px 8px; white-space: nowrap; border: 1px dashed #777; }
-  .flame.confirmed { border-style: solid; border-color: #aab; }
+  .box { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55); font-size: 15px; line-height: 1.35; }
+
+  /* Chips */
+  .tier { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+    font-weight: 800; font-size: 12px; border-radius: 6px; margin-right: 6px; color: #15121f; vertical-align: 1px; }
+  .tier.S { background: linear-gradient(#ffd166, #f5a623); } .tier.A { background: linear-gradient(#d7a0ff, #b866f0); }
+  .tier.B { background: linear-gradient(#8fb2ff, #5b8cf0); } .tier.C { background: #9aa0b4; } .tier.D { background: #4b5068; color: #ddd; }
+  .rank { display: inline-flex; align-items: center; height: 20px; font-weight: 700; font-size: 12px; padding: 0 8px;
+    border-radius: 10px; background: #353a52; color: var(--muted); margin-right: 7px; vertical-align: 1px; letter-spacing: 0.02em; }
+  .best .rank, .rank.go { background: var(--good); color: #052b16; }
+  .rank.no { background: #4a2430; color: #ffb3b3; }
+  .label { font-weight: 650; }
+  .detail { font-size: 12.5px; color: var(--muted); }
+  .faint { color: var(--faint); }
+  .up { color: var(--good); } .down { color: var(--bad); }
+
+  /* Advice on the Seal Whisper cards */
+  .card { width: 304px; border-left: 4px solid var(--white); }
+  .card .head { display: flex; align-items: center; margin-bottom: 3px; }
+  .card .label { flex: 1; min-width: 0; }
+  .box.best { border-color: rgba(61, 220, 132, 0.55); box-shadow: 0 0 0 1px rgba(61, 220, 132, 0.35), 0 8px 28px rgba(0, 0, 0, 0.55); }
+  .score { font-size: 12px; margin-top: 5px; color: var(--muted); display: flex; gap: 12px; }
+  .score b { color: var(--text); font-weight: 650; }
+  .hint { font-size: 13px; }
+
+  /* Flames around the anchor ring */
+  .flame { font-size: 14px; padding: 5px 9px; white-space: nowrap; border-style: dashed; border-color: #6a6f88; border-radius: 9px; }
+  .flame.confirmed { border-style: solid; border-color: #8d92ab; }
   .flame.whisper { border-color: #4fd0e0; }
-  .flame.bestflame { outline: 2px solid var(--good); }
-  .flame.bestflame .rank { background: var(--good); color: #062; }
-  .panel { left: 1560px; top: 82px; width: 330px; }
-  .panel h1 { font-size: 15px; margin: 0 0 6px; }
-  .pick { font-size: 13px; display: flex; align-items: center; gap: 6px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--white); flex: none; }
-  .status { margin-top: 6px; font-size: 12px; color: var(--muted); }
-  .chest { margin-top: 6px; padding-top: 6px; border-top: 1px solid #444a63; font-size: 12px; }
+  .flame.bestflame { border-color: rgba(61, 220, 132, 0.7); box-shadow: 0 0 0 1px rgba(61, 220, 132, 0.4), 0 8px 28px rgba(0, 0, 0, 0.55); }
+  .flame.bestflame .rank { background: var(--good); color: #052b16; }
+
+  /* Rarity */
   .white { --c: var(--white); } .blue { --c: var(--blue); } .purple { --c: var(--purple); } .orange { --c: var(--orange); }
   .card.white, .card.blue, .card.purple, .card.orange { border-left-color: var(--c); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--white); flex: none; }
   .dot.white, .dot.blue, .dot.purple, .dot.orange { background: var(--c); }
-  .up { color: var(--good); } .down { color: #ff7a7a; }
-  .goals { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
-  .goal { pointer-events: auto; cursor: pointer; font-size: 12px; padding: 2px 8px; border-radius: 10px;
-    background: #2a2d40; color: var(--muted); border: 1px solid #444a63; }
-  .goal:hover { border-color: #aab; color: var(--text); }
-  .goal.on { background: var(--good); color: #062; border-color: var(--good); font-weight: 700; }
-  .ask { font-size: 12px; color: var(--orange); font-weight: 600; }
-  .panel { pointer-events: auto; }
-  /* Tier (S-D): the card or flame on its own, like a tier list. */
-  .tier { display: inline-block; min-width: 18px; text-align: center; font-weight: 800; font-size: 13px;
-    padding: 1px 4px; border-radius: 4px; margin-right: 6px; color: #111; }
-  .tier.S { background: #ffb020; } .tier.A { background: #c066f0; } .tier.B { background: #5b8cf0; }
-  .tier.C { background: #9aa0b4; } .tier.D { background: #5a6075; color: #ddd; }
-  .score { font-size: 12px; margin-top: 3px; }
-  .score b { color: var(--text); }
-  .consent { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #444a63; font-size: 13px; }
-  .consent .goals { margin-top: 6px; }
-  .link { pointer-events: auto; cursor: pointer; text-decoration: underline; }
+
+  /* The dock: status, first-start question and the Black Sail panel, top right */
+  /* Right of the right card advice box (it ends at x ~1596) so the two never overlap. */
+  .dock { position: absolute; left: 1604px; top: 82px; width: 300px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+  .dock .box { position: static; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.01em; }
+  .brand svg { flex: none; }
+  .brand .grow { flex: 1; }
+  .lights { display: flex; gap: 6px; }
+  .light { width: 9px; height: 9px; border-radius: 50%; background: var(--off); }
+  .light.ok { background: var(--good); box-shadow: 0 0 6px rgba(61, 220, 132, 0.8); }
+  .light.wait { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+  .light.bad { background: var(--bad); box-shadow: 0 0 6px rgba(255, 93, 93, 0.8); }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .rows { margin-top: 8px; display: grid; grid-template-columns: auto auto 1fr; gap: 5px 8px; align-items: center; font-size: 13px; }
+  .rows .light { margin-top: 1px; }
+  .rows .what { color: var(--muted); }
+  .ready { margin-top: 9px; padding: 7px 10px; border-radius: 8px; background: rgba(61, 220, 132, 0.12); color: var(--good);
+    font-weight: 650; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .hint-note { margin-top: 8px; font-size: 12.5px; line-height: 1.4; color: var(--warn); }
+  .problem { margin-top: 9px; padding: 7px 10px; border-radius: 8px; background: rgba(255, 93, 93, 0.1); color: #ffc2c2; font-size: 12.5px; }
+
+  .consent b { font-size: 14px; }
+  .consent .detail { margin-top: 4px; }
+  .buttons { display: flex; gap: 6px; margin-top: 9px; }
+  .btn { cursor: pointer; font-size: 12.5px; font-weight: 600; padding: 5px 14px; border-radius: 8px;
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .btn:hover { border-color: #9aa0b4; }
+  .btn.primary { background: var(--good); color: #052b16; border-color: var(--good); }
+
+  .panel h1 { margin: 0; font-size: 14px; }
+  .chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .set { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .set b { color: var(--gold); }
+  .ask { font-size: 12.5px; color: var(--gold); font-weight: 600; margin-top: 8px; }
+  .goals { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 4px; }
+  .goal { cursor: pointer; font-size: 12px; padding: 3px 10px; border-radius: 10px;
+    background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .goal:hover { border-color: #9aa0b4; color: var(--text); }
+  .goal.on { background: var(--good); color: #052b16; border-color: var(--good); font-weight: 700; }
+  .picks { margin-top: 6px; display: grid; gap: 3px; }
+  .pick { font-size: 13px; display: flex; align-items: center; gap: 7px; }
+  .chest { margin-top: 8px; padding: 7px 9px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+  .chest b { color: var(--gold); }
+  .status { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .notice { margin-top: 6px; font-size: 12.5px; color: var(--warn); }
+  .foot { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); font-size: 12px; color: var(--faint); }
+  .link { cursor: pointer; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
   .link:hover { color: var(--text); }
-  .notice { margin-top: 6px; font-size: 12px; color: var(--orange); }
 </style>
 </head>
 <body>
@@ -65,14 +112,28 @@
   const stage = document.getElementById("stage");
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const tier = (t) => (t ? `<span class="tier ${t}" title="Tier: how strong on its own">${t}</span>` : "");
+  const SAIL = `<svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15.5" fill="#181430"/><path d="M10 6 L10 25 L23 24 Z" fill="#f0b030"/><rect x="8.5" y="5" width="1.6" height="21" fill="#c8d2dc"/></svg>`;
   /**
    * final ×N: the expected final chest vs a chest with no Whispers (what ★ BEST is based on, so the
    * best card has the highest); now +X%: how much the card raises the current chest right now.
    */
   const scores = (c) => {
     const now = Math.round(c.nowPct);
-    return `<div class="score detail" title="final: expected 6-card chest vs no Whispers (decides BEST) · now: what it adds to your chest right away">final <b>×${c.final.toFixed(2)}</b> · now <b class="${now < 0 ? "down" : ""}">${now >= 0 ? "+" : ""}${now}%</b> chest</div>`;
+    return `<div class="score" title="final: expected 6-card chest vs no Whispers (decides BEST) · now: what it adds to your chest right away">
+      <span>final <b>×${c.final.toFixed(2)}</b></span><span>now <b class="${now < 0 ? "down" : ""}">${now >= 0 ? "+" : ""}${now}%</b></span></div>`;
   };
+
+  /** Game and log lights, and whether the player is ready to go. */
+  function statusCard(h, version) {
+    const rows = `<div class="rows">
+      <span class="light ${h.game}"></span><span>Game</span><span class="what">${esc(h.gameText)}</span>
+      <span class="light ${h.log}"></span><span>Log</span><span class="what">${esc(h.logText)}</span></div>`;
+    const verdict = h.ready
+      ? `<div class="ready">✓ Ready to play</div>`
+      : h.problem ? `<div class="problem">${esc(h.problem)}</div>` : "";
+    const note = h.note ? `<div class="hint-note">${esc(h.note)}</div>` : "";
+    return `<div class="box status-card"><div class="brand">${SAIL}<span class="grow">TLI Overlay</span><span class="faint" style="font-weight:500;font-size:12px">${esc(version)}</span></div>${rows}${verdict}${note}</div>`;
+  }
 
   function render(s) {
     const k = s.game.width / 1920;
@@ -91,21 +152,22 @@
         const isBest = c.rank === 1 && !switchWins;
         const tie = c.tie && !switchWins; // a tie with the Switch card would make it EITHER, not BEST
         const badge = tie ? "≈ EITHER" : isBest ? "★ BEST" : "#" + (switchWins ? c.rank + 1 : c.rank);
-        html.push(`<div class="box card ${c.rarity ?? ""} ${isBest || tie ? "best" : ""}" style="left:${CARD_X[c.slot] - 150}px; top:212px">
-          ${tier(c.tier)}<span class="rank">${badge}</span><span class="label">${esc(c.label)}</span>
+        html.push(`<div class="box card ${c.rarity ?? ""} ${isBest || tie ? "best" : ""}" style="left:${CARD_X[c.slot] - 152}px; top:212px">
+          <div class="head">${tier(c.tier)}<span class="rank">${badge}</span><span class="label">${esc(c.label)}</span></div>
           <div class="detail">${esc(c.reason)}</div>${scores(c)}</div>`);
       }
       if (!s.switchCard && s.switchHint) {
         // Switch not pressed yet: is the unknown Switch card worth the clicks?
         const pct = Math.round(s.switchHint.chance * 100);
-        html.push(`<div class="box" style="left:1080px; top:160px; font-size:13px">${pct > 0
-          ? `Switch: <b class="up">worth a look</b> · ${pct}% chance it beats the best`
-          : 'Switch: <b class="down">skip</b> · no rarity beats the best'}</div>`);
+        html.push(`<div class="box hint" style="left:1080px; top:160px">${pct > 0
+          ? `<span class="rank go">Switch</span>worth a look · <b>${pct}%</b> chance it beats the best`
+          : '<span class="rank no">Switch</span>skip it · no rarity beats the best'}</div>`);
       }
       if (sw && sw.diff !== null) {
         const badge = switchWins ? "★ BEST" : sw.tie ? "≈ EITHER" : "▼ WORSE";
         const what = switchWins ? "press Switch and take it" : sw.tie ? "same as the best of these 3" : "keep one of these 3";
-        html.push(`<div class="box ${switchWins || sw.tie ? "best" : ""}" style="left:1080px; top:118px; width:340px; font-size:13px">${tier(sw.tier)}<span class="rank">${badge}</span>Switch card: <b>${esc(sw.label)}</b>
+        html.push(`<div class="box hint ${switchWins || sw.tie ? "best" : ""}" style="left:1080px; top:118px; width:344px">
+          <div>${tier(sw.tier)}<span class="rank ${switchWins || sw.tie ? "go" : "no"}">${badge}</span>Switch card: <b>${esc(sw.label)}</b></div>
           <div class="detail">${what}</div>${scores(sw)}</div>`);
       }
     }
@@ -117,47 +179,53 @@
       const detail = d === null
         ? "3 cards not read: press Return once to compare"
         : `${s.switchCard.tie ? "same as" : d > 0 ? "better than" : "worse than"} the best of the 3 cards${best3 ? ` (final ×${best3.final.toFixed(2)})` : ""}`;
-      html.push(`<div class="box card ${s.switchCard.rarity ?? ""} ${d > 0 || s.switchCard.tie ? "best" : ""}" style="left:810px; top:212px">
-        ${tier(s.switchCard.tier)}<span class="rank">${verdict}</span><span class="label">${esc(s.switchCard.label)}</span>
+      html.push(`<div class="box card ${s.switchCard.rarity ?? ""} ${d > 0 || s.switchCard.tie ? "best" : ""}" style="left:808px; top:212px">
+        <div class="head">${tier(s.switchCard.tier)}<span class="rank ${d !== null && d <= 0 && !s.switchCard.tie ? "no" : ""}">${verdict}</span><span class="label">${esc(s.switchCard.label)}</span></div>
         <div class="detail">${detail}</div>${scores(s.switchCard)}</div>`);
     }
     if (s.screen === "flames") {
       for (const f of s.flames) {
         const pos = f.side === "left" ? `right:${1920 - (f.x - 48)}px` : `left:${f.x + 48}px`;
-        html.push(`<div class="box flame ${f.confirmed ? "confirmed" : ""} ${f.kind ?? ""} ${f.best ? "bestflame" : ""}" style="${pos}; top:${f.y - 16}px">${tier(f.tier)}${f.best ? '<span class="rank">★ PUT IN</span>' : ""}${esc(f.label)}</div>`);
+        html.push(`<div class="box flame ${f.confirmed ? "confirmed" : ""} ${f.kind ?? ""} ${f.best ? "bestflame" : ""}" style="${pos}; top:${f.y - 17}px">${tier(f.tier)}${f.best ? '<span class="rank">★ PUT IN</span>' : ""}${esc(f.label)}</div>`);
       }
     }
-    const panelShown = s.screen !== "none" || s.showPanel || s.share.ask;
-    // Same place as the panel: inside it when the panel is up.
-    if (s.notice && !panelShown) html.push(`<div class="box" style="left:1560px; top:82px; width:330px; font-size:12px">Black Sail overlay: ${esc(s.notice)}</div>`);
+
+    // The dock, top right: status card, first-start question, Black Sail panel.
+    const dock = [];
+    if (s.health.show) dock.push(statusCard(s.health, s.version));
+    if (s.share.ask) {
+      // Asked once at first start; nothing is sent before the player answers yes.
+      dock.push(`<div class="box consent"><b>Help improve the advisor?</b>
+        <div class="detail">Share anonymous Black Sail data: the cards offered, your picks, chest drops, what the overlay read and your screen size.
+        Never the game log, screenshots, your Steam ID or names. Turn it off or delete it any time from the tray icon.</div>
+        <div class="buttons"><span class="btn primary" data-share="yes">Share</span><span class="btn" data-share="no">Don't share</span></div></div>`);
+    }
+    const panelShown = s.screen !== "none" || s.showPanel;
     if (panelShown) {
       const picks = s.picks.map((p) => `<div class="pick"><span class="dot ${p.rarity ?? ""}"></span>${esc(p.label)}</div>`).join("");
       const goals = s.goals.map((g) => `<span class="goal ${g.id === s.goal ? "on" : ""}" data-goal="${esc(g.id)}">${esc(g.label)}</span>`).join("");
       const ask = s.askGoal ? '<div class="ask">New cycle: what do you farm?</div>' : "";
       const chest = s.lastChest
-        ? `<div class="chest">Chest ${s.lastChest.cycle}: ${s.lastChest.scraps} Scraps · ${s.lastChest.threads} Threads · ${s.lastChest.heroMemories} Mem · ${s.lastChest.invitations} Inv
-           <b>≈ ${s.lastChest.fe.toFixed(0)} FE</b> <span class="detail">(model ${s.lastChest.modelFe.toFixed(0)})</span></div>`
+        ? `<div class="chest">Chest of cycle ${s.lastChest.cycle} · <b>≈ ${s.lastChest.fe.toFixed(0)} FE</b> <span class="faint">(model ${s.lastChest.modelFe.toFixed(0)})</span>
+           <div class="detail">${s.lastChest.scraps} Scraps · ${s.lastChest.threads} Threads · ${s.lastChest.heroMemories} Memories · ${s.lastChest.invitations} Invitations</div></div>`
         : "";
-      const set = s.setScore !== null && s.picks.length ? ` · set ×${s.setScore.toFixed(2)}` : "";
-      // Asked once at first start; nothing is sent before the player answers yes.
-      const consent = s.share.ask
-        ? `<div class="consent"><b>Help improve the advisor?</b>
-           <div class="detail">Share anonymous Black Sail data: the cards offered, your picks, chest drops, what the overlay read and your screen size.
-           Never the game log, screenshots, your Steam ID or names. You can turn it off or delete it from the tray icon.</div>
-           <div class="goals"><span class="goal on" data-share="yes">Share</span><span class="goal" data-share="no">Don't share</span></div></div>`
-        : "";
-      const report = s.share.available ? `<div class="detail">Wrong read? <span class="link" data-report>Report it</span> (Ctrl+Shift+R)</div>` : "";
-      html.push(`<div class="box panel" id="panel">${consent}<h1>Black Sail · cycle ${s.cycle} · ${s.picks.length}/6${set}</h1>
-        ${ask}<div class="goals">${goals}</div>
-        ${picks || '<div class="detail">no Whispers picked yet</div>'}${chest}<div class="status">${esc(s.status)}</div>
-        ${s.notice ? `<div class="notice">${esc(s.notice)}</div>` : ""}${report}</div>`);
-    }
+      const set = s.setScore !== null && s.picks.length ? `<div class="set">Set so far <b>×${s.setScore.toFixed(2)}</b> a chest without Whispers</div>` : "";
+      const lights = `<span class="lights" title="Game · Log"><span class="light ${s.health.game}"></span><span class="light ${s.health.log}"></span></span>`;
+      const report = s.share.available ? `<div class="foot">Wrong read? <span class="link" data-report>Report it</span> · Ctrl+Shift+R</div>` : "";
+      dock.push(`<div class="box panel">
+        <div class="brand">${SAIL}<h1 class="grow">Black Sail</h1><span class="chip">Cycle ${s.cycle} · ${s.picks.length}/6</span>${lights}</div>
+        ${set}${ask}<div class="goals">${goals}</div>
+        <div class="picks">${picks || '<div class="detail">No Whispers picked yet</div>'}</div>${chest}
+        <div class="status">${esc(s.status)}</div>${s.notice ? `<div class="notice">${esc(s.notice)}</div>` : ""}${report}</div>`);
+    } else if (s.notice) dock.push(`<div class="box detail">${esc(s.notice)}</div>`);
+    if (dock.length) html.push(`<div class="dock" id="dock">${dock.join("")}</div>`);
+
     stage.innerHTML = html.join("");
-    // The main process makes the window clickable while the cursor is inside this box (screen
+    // The main process makes the window clickable while the cursor is inside the dock (screen
     // pixels of the window, scale included). The game keeps mouse events to itself, so the page
     // can't detect hovering on its own.
-    const panel = document.getElementById("panel");
-    const r = panel && panel.getBoundingClientRect();
+    const d = document.getElementById("dock");
+    const r = d && d.getBoundingClientRect();
     window.overlay.setPanelRect(r ? { x: r.left, y: r.top, width: r.width, height: r.height } : null);
   }
 

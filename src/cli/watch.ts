@@ -173,7 +173,7 @@ async function main() {
   const log = join(LOG_DIR, "UE_game.log");
   const tailer = new LogTailer(log, (line) => engine.feed(line), { fromEnd: true, prime: (line) => engine.prime(line) });
   await tailer.start();
-  console.log(tailer.hasFile ? `Watching ${log}` : `Waiting for ${log} (in game: Settings → Other → Enable Log)`);
+  console.log(tailer.hasFile ? `Watching ${log}` : `Waiting for ${log} (in game: Esc → Settings → Other → Enable Log, under Account Related; then log out and back in)`);
   console.log(`Seal Whisper cycle ${tracker.summary().cycle}: ${tracker.currentPicks.length}/${PICKS_PER_CYCLE} picked so far`);
   console.log("Open an anchor or Seal Whisper screen in game; one frame is grabbed per screen/click. Ctrl+C to stop.");
 }

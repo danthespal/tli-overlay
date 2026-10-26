@@ -9,12 +9,25 @@ import { ADVISOR_CONFIG, type AdvisorConfig } from "./advisor.js";
 import { calibrate, type ChestLike, type FlameLike, type History, type SalvageLike, type ScreenLike } from "./calibrate.js";
 import { SALVAGE_FILE } from "./salvageTracker.js";
 
-async function jsonl<T>(path: string): Promise<T[]> {
+/** A .jsonl history file, one record per line (missing file = none). */
+export async function jsonl<T>(path: string): Promise<T[]> {
+  let text: string;
   try {
-    return (await readFile(path, "utf8")).split("\n").filter(Boolean).map((l) => JSON.parse(l) as T);
+    text = await readFile(path, "utf8");
   } catch {
     return [];
   }
+  // Line by line: a line cut off by a crash mid-append costs that line, not the whole history.
+  const out: T[] = [];
+  for (const l of text.split("\n")) {
+    if (!l.trim()) continue;
+    try {
+      out.push(JSON.parse(l) as T);
+    } catch {
+      /* cut-off line */
+    }
+  }
+  return out;
 }
 
 export async function loadHistory(historyDir: string): Promise<History> {

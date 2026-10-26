@@ -160,8 +160,10 @@ export class PickTracker implements ToolModule {
     return this.state.picks;
   }
 
+  /** This cycle's goal; one no longer offered (e.g. a saved "fe") falls back to the default. */
   get goal(): string {
-    return this.state.goal ?? DEFAULT_GOAL;
+    const g = this.state.goal;
+    return g && this.deps.config.goals.list.some((x) => x.id === g) ? g : DEFAULT_GOAL;
   }
 
   /** Sets this cycle's goal (from the overlay) and re-ranks the cards on screen. */

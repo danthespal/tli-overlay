@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,7 +7,7 @@ import { Dataset } from "../src/capture/dataset.js";
 import { Engine } from "../src/engine/engine.js";
 import { extractEvent } from "../src/engine/events.js";
 import { parseLogLine } from "../src/engine/logLine.js";
-import { LogTailer } from "../src/engine/logReader.js";
+import { LogTailer, MAX_READ } from "../src/engine/logReader.js";
 import type { ZoneVisit } from "../src/engine/session.js";
 import { BlackSailModule } from "../src/modules/black-sail/index.js";
 
@@ -155,6 +155,79 @@ describe("LogTailer", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("after a jump reads only the newest MAX_READ bytes, and says when the log was replaced", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tli-"));
+    const file = join(dir, "UE_game.log");
+    await writeFile(file, "start\n");
+    const seen: string[] = [];
+    let rotations = 0;
+    const tailer = new LogTailer(file, (l) => seen.push(l.text), { fromEnd: true, pollMs: 60_000, onRotate: () => rotations++ });
+    try {
+      await tailer.start();
+      const filler = "x".repeat(99) + "\n"; // 100 bytes a line
+      await appendFile(file, filler.repeat(MAX_READ / 100 + 500) + "last\n");
+      await tailer.poll();
+      expect(seen.at(-1)).toBe("last");
+      expect(seen.length).toBe(Math.floor((MAX_READ - 5) / 100) + 1); // newest whole lines + "last"; the older part was skipped
+      expect(seen.every((t) => t === "x".repeat(99) || t === "last")).toBe(true); // no cut-off piece
+      await writeFile(file, "new log\n"); // smaller: the game started a new log
+      await tailer.poll();
+      expect(seen.at(-1)).toBe("new log");
+      expect(rotations).toBe(1);
+    } finally {
+      tailer.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("goes on after a line handler throws, and delivers nothing once stopped", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tli-"));
+    const file = join(dir, "UE_game.log");
+    await writeFile(file, "");
+    const seen: string[] = [];
+    const errors: string[] = [];
+    const tailer = new LogTailer(
+      file,
+      (l) => {
+        if (l.text === "bad") throw new Error("boom");
+        seen.push(l.text);
+      },
+      { fromEnd: true, pollMs: 60_000, onError: (err) => errors.push(String(err)) },
+    );
+    try {
+      await tailer.start();
+      await appendFile(file, "a\nbad\nb\n");
+      await tailer.poll();
+      expect(seen).toEqual(["a", "b"]);
+      expect(errors).toEqual(["Error: boom"]);
+      tailer.stop();
+      await appendFile(file, "after stop\n");
+      await tailer.poll();
+      expect(seen).toEqual(["a", "b"]);
+    } finally {
+      tailer.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Engine module isolation", () => {
+  it("keeps feeding the other modules when one throws", () => {
+    const seen: string[] = [];
+    const failed: string[] = [];
+    const engine = new Engine(
+      [
+        { id: "bad", name: "bad", onLine: () => { throw new Error("boom"); }, summary: () => ({}) },
+        { id: "good", name: "good", onLine: (l) => void seen.push(l.text), summary: () => ({}) },
+      ],
+      undefined,
+      (m) => failed.push(m.id),
+    );
+    feedAll(engine, [L.pickStart, L.pickEnd]);
+    expect(seen).toEqual(["ItemChange@ ProtoName=PickItems start", "ItemChange@ ProtoName=PickItems end"]);
+    expect(failed).toEqual(["bad", "bad"]);
+  });
 });
 
 describe("Dataset", () => {
@@ -173,6 +246,19 @@ describe("Dataset", () => {
       expect(existsSync(join(root, "2026-10-26", "frames"))).toBe(true); // made for the capture script
       expect(await readFile(join(root, "2026-10-25", "events.jsonl"), "utf8")).toContain('"n":1');
       expect(await readFile(join(root, "2026-10-26", "events.jsonl"), "utf8")).toContain('"n":2');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("prunes day folders older than the days it keeps, and nothing else", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tli-data-"));
+    const dataset = new Dataset(root, () => new Date("2026-10-26T12:00:00.000Z"));
+    try {
+      for (const d of ["2026-10-01", "2026-10-12", "2026-10-13", "2026-10-26", "notes"]) await mkdir(join(root, d), { recursive: true });
+      expect(await dataset.prune(14)).toEqual(["2026-10-01", "2026-10-12"]); // keeps 10-13 .. 10-26
+      expect(existsSync(join(root, "2026-10-13"))).toBe(true);
+      expect(existsSync(join(root, "notes"))).toBe(true);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

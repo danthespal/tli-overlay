@@ -8,7 +8,7 @@ import { appendFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { release, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Dataset } from "../capture/dataset.js";
+import { Dataset, KEEP_DAYS } from "../capture/dataset.js";
 import type { GrabResult } from "../capture/windowCapture.js";
 import { CaptureWorker, warmOnScreens } from "../capture/worker.js";
 import { GameCapture } from "../capture/gameCapture.js";
@@ -19,6 +19,8 @@ import { MAX_IMAGE, type Kind } from "../share/schema.js";
 import { Sharer } from "../share/sharer.js";
 import { Engine } from "../engine/engine.js";
 import { findLog, gameLogDirs, gameProgram, gameRunning, STALE_MS } from "../engine/findLog.js";
+import { LogDetail } from "../engine/logDetail.js";
+import { readGameLogState, type GameLogState } from "../engine/gameLogState.js";
 import { LogTailer } from "../engine/logReader.js";
 import { configForGoal, DEFAULT_GOAL, loadAdvisorConfig, setScore, type Tier } from "../modules/black-sail/advisor.js";
 import { chestReport } from "../modules/black-sail/calibrate.js";
@@ -78,7 +80,12 @@ export interface OverlayState {
   notice: string | null;
   /** Anonymous data sharing: available in this build, still to be asked (first start), on. */
   share: { available: boolean; ask: boolean; on: boolean };
+  /** Game and log lights (status card, panel header): the player sees both are OK before playing. */
+  health: { game: Light; gameText: string; log: Light; logText: string; ready: boolean; problem: string | null; note: string | null; show: boolean };
+  version: string;
 }
+
+type Light = "ok" | "wait" | "bad" | "off";
 
 const FLAME_LABEL: Record<string, string> = {
   boss_whisper: "Boss Whisper",
@@ -104,6 +111,12 @@ const label = (effect: string) => {
 };
 
 async function main() {
+  // (--demo and --probe-capture are one-shot checks that may run next to a live overlay.)
+  const oneShot = process.argv.includes("--demo") || process.argv.includes("--probe-capture");
+  if (!oneShot && !app.requestSingleInstanceLock()) {
+    app.quit();
+    return;
+  }
   await app.whenReady();
   const display = screen.getPrimaryDisplay();
   const win = new BrowserWindow({
@@ -145,6 +158,8 @@ async function main() {
     askGoal: false,
     notice: null,
     share: { available: false, ask: false, on: false },
+    health: { game: "off", gameText: "Checking…", log: "wait", logText: "Looking for the game log…", ready: false, problem: null, note: null, show: true },
+    version: "",
   };
   // Timers and late events can fire while the app quits, after the window is gone.
   const send = () => {
@@ -158,7 +173,11 @@ async function main() {
   const keepFrames = process.argv.includes("--dataset");
   const dataset = new Dataset(join(USER_DIR, "dataset"));
   await dataset.init();
+  // Players only: a development dataset (frames kept with --dataset) is the developer's to keep.
+  const pruned = PACKAGED ? await dataset.prune().catch(() => [] as string[]) : [];
+  if (pruned.length) console.log(`dataset: removed ${pruned.length} day(s) older than ${KEEP_DAYS} days`);
   const scratch = join(tmpdir(), "tli-overlay");
+  await rm(scratch, { recursive: true, force: true }); // frames left by a crash
   await mkdir(scratch, { recursive: true });
   // The last frame and what was read from it are kept (one file, in the temp folder) for a
   // report ("that was wrong"); every other frame is deleted once read.
@@ -184,6 +203,7 @@ async function main() {
     onLog: (m) => console.log(`[share] ${m}`),
   });
   await sharer.load();
+  state.version = `v${APP_VERSION}`;
   const refreshShare = () => (state.share = { available: sharer.available, ask: sharer.asking, on: sharer.on });
   refreshShare();
   const SHARED = new Set<Kind>(["capture", "cards", "flames", "skipped", "picked", "flameChosen", "chest", "bossRun", "salvage", "goal"]);
@@ -195,7 +215,84 @@ async function main() {
       sharer.add(kind as Kind, shared);
     }
   };
+  // Which UE_game.log to follow, looked for again every 5 s (see engine/findLog.ts): the game may
+  // start after the overlay, from another install, or write UE_game_2.log.
+  const logDirs = gameLogDirs(); // registry and Steam files: read once
+  let program: string | null = null;
+  let gameSince = 0;
+  const search = () => findLog({ override: process.env.TLI_LOG_DIR, chosen: settings.logPath, program, gameSince, dirs: logDirs });
+  let found = search();
   let logBy = "not found"; // how the log was found, for the session record
+
+  // Game and log lights. The status card shows at start and for a while after a light changes,
+  // and stays while the game runs and something is wrong (or no log can be found at all).
+  let tray: Tray | null = null;
+  let windowSeen = false;
+  let logWritten = 0; // last change of the followed log (ms), 0 = no file
+  const logDetail = new LogDetail(); // Enable Log on or off, from the lines read
+  // The game's own files about its logging (crash count, saved choice): see engine/gameLogState.ts.
+  let gameLog: GameLogState = { crashStarts: null, manual: null };
+  const readGameLog = async () => {
+    gameLog = found ? await readGameLogState(found.path) : { crashStarts: null, manual: null };
+  };
+  let showUntil = Date.now() + 10_000;
+  let healthKey = "";
+  let tooltip = "TLI Overlay";
+  let hideTimer: NodeJS.Timeout | undefined;
+  function refreshHealth(): boolean {
+    const now = Date.now();
+    const running = gameSince > 0;
+    const game: Light = !running ? "off" : windowSeen ? "ok" : "wait";
+    const gameText = !running ? "Not running" : windowSeen ? "Window found" : "Looking for the game window…";
+    let log: Light;
+    let logText: string;
+    let problem: string | null = null;
+    if (!found) {
+      [log, logText] = ["bad", "Not found"];
+      problem = "Game log not found. Tray icon → Choose UE_game.log";
+    } else if (!running) [log, logText] = logWritten ? ["ok", "Found"] : ["wait", "Appears when the game starts"];
+    else {
+      // The game says at login whether its log is on and why, and the gameplay lines the triggers
+      // come from confirm it (engine/logDetail.ts); with neither seen yet, 2 minutes of play decide.
+      const fresh = logWritten > 0 && now - logWritten < STALE_MS;
+      const { verdict, reason } = logDetail;
+      if (verdict === "on" && fresh) [log, logText] = ["ok", reason === "HaveCrashedCount" ? "On (turned on by the game)" : reason === "pressed" ? "Enable Log on (pressed)" : "Enable Log on"];
+      else if (verdict !== "off" && now - gameSince < STALE_MS) [log, logText] = ["wait", fresh ? "Checking Enable Log…" : "Waiting for the game…"];
+      else {
+        [log, logText] = verdict === "on" ? ["bad", "Not being written"] : ["bad", "Enable Log is off"];
+        problem = "In game: Esc → Settings → Other → Enable Log (under Account Related), then log out and back in";
+      }
+    }
+    // What the player should know about Enable Log beyond the light: it isn't saved by the game.
+    const left = gameLog.crashStarts;
+    const ENABLE = "Esc → Settings → Other → Enable Log";
+    let note: string | null = null;
+    if (gameLog.manual !== true) {
+      if (logDetail.pressed) note = "Enable Log lasts until you close the game: press it again next time.";
+      else if (logDetail.reason === "HaveCrashedCount" && left !== null)
+        note = left > 0
+          ? `Logging is on only because of recent game crashes, for ${left} more game start${left === 1 ? "" : "s"}. After that, press ${ENABLE} each time you start the game, then log out and back in.`
+          : `Logging is on only because of recent game crashes, and this is the last game start it does that. Next time, press ${ENABLE}, then log out and back in.`;
+      else if (log === "bad" && left === 0) note = "The game doesn't remember Enable Log: press it each time you start the game.";
+    }
+    const ready = game === "ok" && log === "ok";
+    const key = `${game}|${log}`;
+    if (key !== healthKey) {
+      healthKey = key;
+      showUntil = now + 8000;
+      tooltip = `TLI Overlay · ${ready ? "Ready to play" : problem ?? (running ? "Starting…" : "Game not running")}${note ? `\n${note}` : ""}`;
+      tray?.setToolTip(tooltip);
+    }
+    // Few forced starts left: the warning stays up for the first minute of play.
+    const lastStarts = note !== null && left !== null && left <= 2 && running && now - gameSince < 60_000;
+    const show = now < showUntil || (running && !ready) || lastStarts;
+    clearTimeout(hideTimer);
+    if (now < showUntil) hideTimer = setTimeout(() => refreshHealth() && send(), showUntil - now + 50);
+    const next = { game, gameText, log, logText, ready, problem, note, show };
+    const changed = JSON.stringify(next) !== JSON.stringify(state.health);
+    state.health = next;
+    return changed;
+  }
   const shareSession = () => {
     const d = screen.getPrimaryDisplay();
     sharer.add("session", {
@@ -247,6 +344,10 @@ async function main() {
       record("capture", { width: g.width, height: g.height, via });
     }
     if (!g.ok) record("skipped", { screen: screenName, trigger, reason: g.reason });
+    if (g.ok !== windowSeen && (g.ok || g.reason === "game window not found")) {
+      windowSeen = g.ok;
+      refreshHealth();
+    }
     if (g.ok && g.x !== undefined && g.y !== undefined && !win.isDestroyed()) {
       const dip = screen.screenToDipRect(null, { x: g.x, y: g.y, width: g.width, height: g.height });
       // Follow the game to whichever monitor it is on (the window starts on the primary one).
@@ -496,6 +597,8 @@ async function main() {
     const out = resolve(process.argv[demo + 2] ?? join(import.meta.dirname, "../../reports/overlay-demo.png"));
     win.setBounds({ x: 0, y: 0, width: 1920, height: 1080 });
     state.game = { x: 0, y: 0, width: 1920, height: 1080 };
+    // The picture shows the advice with green lights, as when playing (no status card).
+    state.health = { ...state.health, game: "ok", gameText: "Window found", log: "ok", logText: "Enable Log on", ready: true, show: false };
     win.webContents.send("background", pathToFileURL(image).href);
     const [page] = await ocrImages([image], FLAME_REGIONS);
     const cards = readSealWhisperPage(page!, table);
@@ -563,6 +666,7 @@ async function main() {
     void Promise.race([Promise.all([tracker.flush(), salvage.flush(), dataset.flush(), sharer.flush()]), new Promise((r) => setTimeout(r, 2000))]).finally(() => app.quit());
   };
   process.on("SIGINT", quit);
+  process.on("unhandledRejection", (err) => console.error(`unhandled: ${err instanceof Error ? err.stack : err}`));
 
   const engine = new Engine([
     warmOnScreens(worker, capture, tesseract),
@@ -572,16 +676,14 @@ async function main() {
     salvage,
   ]);
 
-  // Which UE_game.log to follow, looked for again every 5 s (see engine/findLog.ts): the game may
-  // start after the overlay, from another install, or write UE_game_2.log.
-  const logDirs = gameLogDirs(); // registry and Steam files: read once
-  let program: string | null = null;
-  let gameSince = 0;
-  const search = () => findLog({ override: process.env.TLI_LOG_DIR, chosen: settings.logPath, program, gameSince, dirs: logDirs });
-  let found = search();
   console.log(`log file (${found?.by ?? "not found"}): ${found?.path ?? "-"}`);
   logBy = found?.by ?? "not found";
   shareSession();
+  // Lights right away (the first scan of old logs below can take seconds).
+  logWritten = found ? await stat(found.path).then((s) => s.mtimeMs, () => 0) : 0;
+  await readGameLog();
+  refreshHealth();
+  send();
 
   // Salvages from before the tool ran (old logs, and this session's log so far), once per log.
   if (!demoMode && found) {
@@ -600,22 +702,44 @@ async function main() {
   // Read the log written so far this game session for stack sizes only, so the first pickup of
   // a stack already in the bag (Threads, Compasses) is counted after a restart.
   const follow = async (path: string) => {
-    const t = new LogTailer(path, (line) => engine.feed(line), { fromEnd: true, prime: (line) => engine.prime(line) });
+    logDetail.reset();
+    const t = new LogTailer(
+      path,
+      (line) => {
+        logDetail.note(line);
+        engine.feed(line);
+      },
+      {
+        fromEnd: true,
+        // This session's lines from before the overlay started: the login's log state is among them.
+        prime: (line) => {
+          logDetail.note(line);
+          engine.prime(line);
+        },
+        onRotate: () => logDetail.reset(),
+      },
+    );
     const t0 = Date.now();
     await t.start();
     console.log(`log read in ${Date.now() - t0} ms`);
     return t;
   };
   let tailer = found ? await follow(found.path) : null;
+  logWritten = found ? await stat(found.path).then((s) => s.mtimeMs, () => 0) : 0;
+  refreshHealth();
   send();
 
-  // The log notice is shown only while the game runs: the game creates UE_game.log on start, and
-  // only with logging on. A log that stays unchanged for 2 minutes of play is an old one left
-  // from before logging was turned off.
-  const LOG_NOTICE = "UE_game.log not found or not being written (in game: Settings → Other → Enable Log, or tray icon → Choose UE_game.log)";
+  // Every 5 s: is the game running, is its window there, which log, is it being written. The game
+  // creates UE_game.log on start, and only with logging on; a log unchanged for 2 minutes of play
+  // is an old one left from before logging was turned off.
   let looking = false;
-  const lookAgain = async () => {
-    if (looking || win.isDestroyed()) return;
+  let lookPending = false;
+  const lookAgain = async (): Promise<void> => {
+    if (win.isDestroyed()) return;
+    if (looking) {
+      lookPending = true;
+      return;
+    }
     looking = true;
     try {
       const running = await gameRunning();
@@ -623,7 +747,10 @@ async function main() {
         gameSince = Date.now();
         program = await gameProgram(); // once per game start
         console.log(`game started: ${program ?? "program not readable"}`);
-      } else if (!running) [gameSince, program] = [0, null];
+      } else if (!running) [gameSince, program, windowSeen] = [0, null, false];
+      // The window appears a while after the process: asked until seen (one PowerShell helper,
+      // kept warm between asks, stopped 20 s after the last).
+      if (running && !windowSeen) windowSeen = await worker.window().then((w) => w.ok, () => false);
       const next = search();
       if (next?.path !== found?.path) {
         console.log(`log file (${next?.by ?? "not found"}): ${next?.path ?? "-"}`);
@@ -631,16 +758,16 @@ async function main() {
         found = next;
         tailer = found ? await follow(found.path) : null;
       }
-      const written = found ? await stat(found.path).then((s) => s.mtimeMs, () => 0) : 0;
-      const missing = running && (!written || (Date.now() - gameSince > STALE_MS && Date.now() - written > STALE_MS));
-      const notice = missing ? LOG_NOTICE : state.notice === LOG_NOTICE ? null : state.notice;
-      if (notice !== state.notice) {
-        state.notice = notice;
-        send();
-      }
+      logWritten = found ? await stat(found.path).then((s) => s.mtimeMs, () => 0) : 0;
+      await readGameLog(); // two tiny files; the game rewrites them at each start
+      if (refreshHealth()) send();
       refreshTray();
     } finally {
       looking = false;
+    }
+    if (lookPending) {
+      lookPending = false;
+      await lookAgain();
     }
   };
   const gamePoll = setInterval(() => void lookAgain(), 5000);
@@ -670,6 +797,12 @@ async function main() {
       return send();
     }
     const full = nativeImage.createFromPath(f.path);
+    if (full.isEmpty()) {
+      // Unreadable (deleted or still being written): nothing to show or send.
+      state.status = "The last screen could not be read for a report, try again on the next one";
+      showPanelFor(6000);
+      return send();
+    }
     const img = full.getSize().width > 1600 ? full.resize({ width: 1600, quality: "good" }) : full;
     let quality = 85;
     let jpeg = img.toJPEG(quality);
@@ -705,9 +838,13 @@ async function main() {
   if (sharer.available && !globalShortcut.register("CommandOrControl+Shift+R", () => void openReport())) console.log("Ctrl+Shift+R is taken by another program");
 
   // Tray icon: the overlay has no window of its own to close, so this is where it is controlled.
-  const tray = new Tray(nativeImage.createFromPath(resolve(import.meta.dirname, "icon.png")));
-  tray.setToolTip("TLI Overlay");
+  tray = new Tray(nativeImage.createFromPath(resolve(import.meta.dirname, "icon.png")));
+  tray.setToolTip(tooltip);
+  let trayKey = "";
   function refreshTray() {
+    const key = JSON.stringify([found?.by, found?.path, settings.logPath, sharer.on]);
+    if (!tray || key === trayKey) return;
+    trayKey = key;
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: found ? `Log: ${found.by}` : "Log: not found", enabled: false },
@@ -764,8 +901,17 @@ async function main() {
   }
   refreshTray();
 
+  app.on("second-instance", () => {
+    showUntil = Date.now() + 8000;
+    refreshHealth();
+    send();
+  });
   app.on("window-all-closed", () => app.quit());
   app.on("before-quit", () => {
+    // No more polls while quitting: one could start the PowerShell helper again after its stop.
+    clearInterval(gamePoll);
+    clearInterval(cursorPoll);
+    clearTimeout(hideTimer);
     globalShortcut.unregisterAll();
     capture.dispose();
     worker.stop();

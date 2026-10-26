@@ -40,6 +40,9 @@ async function allow(env: Env, req: Request, records: number, reports: number): 
   const used = row ?? { minute, minute_count: 0, records: 0, reports: 0 };
   const perMinute = used.minute === minute ? used.minute_count + 1 : 1;
   if (perMinute > PER_MINUTE || used.records + records > RECORDS_PER_DAY || used.reports + reports > REPORTS_PER_DAY) return false;
+  // A sender's first upload of the day: yesterday's counters (other keys) are dead, drop them so
+  // the table holds one day, not one row per sender per day forever.
+  if (!row) await env.DB.prepare("DELETE FROM limits WHERE day < ?").bind(day).run();
   await env.DB.prepare(
     "INSERT INTO limits (key, day, minute, minute_count, records, reports) VALUES (?, ?, ?, ?, ?, ?) " +
       "ON CONFLICT (key) DO UPDATE SET minute = excluded.minute, minute_count = excluded.minute_count, records = excluded.records, reports = excluded.reports",
@@ -50,6 +53,8 @@ async function allow(env: Env, req: Request, records: number, reports: number): 
 }
 
 async function body(req: Request): Promise<unknown> {
+  // Refused before reading, when the sender says it is too large (the text check covers the rest).
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY) throw new Error("too large");
   const text = await req.text();
   if (text.length > MAX_BODY) throw new Error("too large");
   return JSON.parse(text);

@@ -112,6 +112,10 @@ export class CaptureWorker {
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.proc = proc;
+    // Writing to a process that just died fails asynchronously (EPIPE) as an "error" event on
+    // stdin; without a listener that is an uncaught exception that takes the whole app down. The
+    // request itself fails through its write callback or the process's exit.
+    proc.stdin.on("error", (err) => this.opts.onLog?.(`stdin: ${err.message}`));
     this.ready = new Promise<void>((resolveReady, rejectReady) => {
       let isReady = false;
       const rl = createInterface({ input: proc.stdout });

@@ -151,10 +151,10 @@ export function findLog(o: LogSearch = {}): FoundLog | null {
   return installed ? { path: join(installed, "UE_game.log"), by: "installed game, no log yet" } : null;
 }
 
-/** Is the game running? tasklist takes ~50 ms. */
+/** Is the game running? tasklist takes ~50 ms (a hung one is killed after 10 s and counts as no). */
 export function gameRunning(): Promise<boolean> {
   return new Promise((done) =>
-    execFile("tasklist", ["/FI", `IMAGENAME eq ${GAME_PROCESS}.exe`, "/NH"], { windowsHide: true }, (err, out) => done(!err && out.toLowerCase().includes(`${GAME_PROCESS}.exe`))),
+    execFile("tasklist", ["/FI", `IMAGENAME eq ${GAME_PROCESS}.exe`, "/NH"], { windowsHide: true, timeout: 10_000 }, (err, out) => done(!err && out.toLowerCase().includes(`${GAME_PROCESS}.exe`))),
   );
 }
 
@@ -164,7 +164,7 @@ export function gameProgram(): Promise<string | null> {
     execFile(
       "powershell.exe",
       ["-NoProfile", "-Command", `(Get-Process -Name ${GAME_PROCESS} -ErrorAction SilentlyContinue | Where-Object Path | Select-Object -First 1).Path`],
-      { windowsHide: true },
+      { windowsHide: true, timeout: 10_000 },
       (err, out) => done(!err && out.trim() ? out.trim() : null),
     ),
   );

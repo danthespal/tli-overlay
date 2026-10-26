@@ -3,10 +3,15 @@
 //
 //   data/dataset/<YYYY-MM-DD>/frames/<time>_<screen>_<trigger>.jpg
 //   data/dataset/<YYYY-MM-DD>/events.jsonl   one JSON object per line: { time, kind, ...data }
+//
+// Day folders older than KEEP_DAYS are deleted at start (prune), so it doesn't grow without end;
+// the history files (data/history/) that the calibration uses are kept.
 
 import { mkdirSync } from "node:fs";
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+
+export const KEEP_DAYS = 14;
 
 export class Dataset {
   private writes: Promise<void> = Promise.resolve();
@@ -24,6 +29,14 @@ export class Dataset {
 
   async init(): Promise<void> {
     await mkdir(join(this.dir, "frames"), { recursive: true });
+  }
+
+  /** Deletes day folders older than `keepDays` (today counts as one). Returns the days removed. */
+  async prune(keepDays = KEEP_DAYS): Promise<string[]> {
+    const oldest = new Date(this.now().getTime() - (keepDays - 1) * 86_400_000).toISOString().slice(0, 10);
+    const days = (await readdir(this.root).catch(() => [] as string[])).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < oldest);
+    for (const d of days) await rm(join(this.root, d), { recursive: true, force: true });
+    return days;
   }
 
   /** Path for a new frame, e.g. frames/2026-10-25T03-39-11-787_voidport_select.jpg (folder created). */

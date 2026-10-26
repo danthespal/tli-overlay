@@ -11,5 +11,5 @@ export const PACKAGED = !!process.versions.electron && !process.defaultApp && ty
 /** Read-only files shipped with the tool: scripts/, data/black-sail/, data/tessdata-fast/. */
 export const APP_DIR = PACKAGED ? process.resourcesPath : resolve(import.meta.dirname, "..");
 
-/** The player's files. The portable exe runs from a temp copy; PORTABLE_EXECUTABLE_DIR is where the .exe really is. */
-export const USER_DIR = PACKAGED ? join(process.env.PORTABLE_EXECUTABLE_DIR ?? dirname(process.execPath), "data") : join(APP_DIR, "data");
+/** The player's files: a data folder next to TLI Overlay.exe (the app folder the player unzipped). */
+export const USER_DIR = PACKAGED ? join(dirname(process.execPath), "data") : join(APP_DIR, "data");

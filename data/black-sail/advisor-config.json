@@ -80,14 +80,10 @@
     "tieFraction": 0.03
   },
   "goals": {
-    "_note": "Chosen per cycle in the overlay. A focus goal multiplies its material's weight by focusBoost and every other material (and other loot) by othersFactor, so the advisor stacks that material and uses the rest only to break ties. 'fe' = plain FE weights. alwaysFull: invitations keep their full FE value under any goal (rare: 1 Craving in 8 chests, 18 FE; player guidance: take a good invitation card whatever the goal).",
+    "_note": "Chosen per cycle in the overlay. A focus goal multiplies its material's weight by focusBoost and every other material (and other loot) by othersFactor, so the advisor stacks that material and uses the rest only to break ties. ('fe', plain FE weights, is internal only: not offered as a goal.) alwaysFull: invitations keep their full FE value under any goal (rare: 1 Craving in 8 chests, 18 FE; player guidance: take a good invitation card whatever the goal).",
     "focusBoost": 10,
     "othersFactor": 0.2,
     "list": [
-      {
-        "id": "fe",
-        "label": "Best FE"
-      },
       {
         "id": "scraps",
         "label": "Scraps",

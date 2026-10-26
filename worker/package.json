@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Collects the Black Sail records and reports the overlay shares (Cloudflare Worker + D1)",
+  "author": "Arsenic",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

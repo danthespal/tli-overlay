@@ -158,7 +158,11 @@ export class FlameWatcher implements ToolModule {
   private async capture(trigger: FlameTrigger, current: () => boolean, attempt: number): Promise<void> {
     const t0 = Date.now();
     const grab = await this.deps.grab(trigger);
-    if (!current()) return;
+    if (!current()) {
+      // A newer click or the screen closing replaced this read: the frame still goes back.
+      if (grab.ok) await this.deps.done?.(grab.file);
+      return;
+    }
     if (!grab.ok) {
       this.readPending = false;
       this.deps.onEvent({ kind: "skipped", trigger, reason: grab.reason });

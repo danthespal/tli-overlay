@@ -32,7 +32,16 @@ export interface TailerOptions {
   pollMs?: number;
   /** With fromEnd: gets every line already in the file before tailing starts (e.g. to learn stack sizes). */
   prime?: (line: LogLine) => void;
+  /** The file appeared, was replaced (the game started a new log) or was cleared: reading restarts at its top. */
+  onRotate?: () => void;
+  /** A line handler threw: the error, then the next line goes on (default: console.error). */
+  onError?: (err: unknown, line: LogLine) => void;
 }
+
+/** Bytes read per poll at most: after a jump (PC woke up, a big log swapped in) only the newest part is read. */
+export const MAX_READ = 1024 * 1024;
+/** Characters of an unfinished line kept between polls (a line can only be longer if the log was cleared mid-write). */
+const MAX_LINE = 8192;
 
 /**
  * Follows a growing log file by polling. Detects rotation (file replaced or truncated)
@@ -47,6 +56,9 @@ export class LogTailer {
   private fileId: number | undefined;
   private timer: NodeJS.Timeout | undefined;
   private busy = false;
+  private stopped = false;
+  /** After a jump the read starts mid-line: that cut piece (up to the first newline) is skipped. */
+  private skipCut = false;
 
   constructor(
     private readonly path: string,
@@ -76,6 +88,7 @@ export class LogTailer {
   }
 
   stop(): void {
+    this.stopped = true; // a poll still in flight delivers nothing more
     clearInterval(this.timer);
     this.timer = undefined;
   }
@@ -97,8 +110,16 @@ export class LogTailer {
         this.lineNo = 0;
         this.partial = "";
         this.decoder = new StringDecoder("utf8");
+        this.options.onRotate?.();
       }
       if (s.size === this.offset) return;
+      if (s.size - this.offset > MAX_READ) {
+        // Too much at once: skip to the newest part (its first, cut line is dropped with the rest).
+        this.offset = s.size - MAX_READ;
+        this.partial = "";
+        this.decoder = new StringDecoder("utf8");
+        this.skipCut = true;
+      }
 
       const fh = await open(this.path, "r");
       try {
@@ -115,12 +136,26 @@ export class LogTailer {
   }
 
   private emit(chunk: string): void {
+    if (this.stopped) return;
+    if (this.skipCut) {
+      const nl = chunk.indexOf("\n");
+      if (nl < 0) return; // still inside the cut line
+      chunk = chunk.slice(nl + 1);
+      this.skipCut = false;
+    }
     const lines = (this.partial + chunk).split(/\r?\n/);
-    this.partial = lines.pop()!; // last piece may be an unfinished line
+    this.partial = lines.pop()!.slice(-MAX_LINE); // last piece may be an unfinished line
     for (let raw of lines) {
       this.lineNo++;
       if (this.lineNo === 1 && raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
-      this.onLine(parseLogLine(raw, this.lineNo));
+      const line = parseLogLine(raw, this.lineNo);
+      // One failing handler must not drop the rest of the batch (the offset is already past them).
+      try {
+        this.onLine(line);
+      } catch (err) {
+        if (this.options.onError) this.options.onError(err, line);
+        else console.error(`log line ${line.lineNo}: ${err instanceof Error ? err.stack : err}`);
+      }
     }
   }
 }

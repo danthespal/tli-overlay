@@ -154,7 +154,7 @@ function Read-Images([string[]]$Paths, [string]$Regions = '') {
         $full = (Resolve-Path $p).Path
         # try/finally: the warm worker lives on after a failed read, and an undisposed stream or
         # Bitmap would keep the frame file locked (and leak the handle) until it exits.
-        $stream = $null; $pix = $null
+        $stream = $null; $pix = $null; $bitmap = $null
         try {
         $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($full)) ([Windows.Storage.StorageFile])
         $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
@@ -191,6 +191,7 @@ function Read-Images([string[]]$Paths, [string]$Regions = '') {
         } finally {
             if ($stream) { $stream.Dispose() }
             if ($pix) { $pix.Dispose() }
+            if ($bitmap) { $bitmap.Dispose() } # SoftwareBitmap holds the decoded frame until disposed
         }
     }
     return @($results)

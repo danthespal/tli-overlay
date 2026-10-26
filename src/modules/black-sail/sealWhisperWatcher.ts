@@ -133,7 +133,11 @@ export class SealWhisperWatcher implements ToolModule {
   private async capture(trigger: Trigger, current: () => boolean, attempt: number): Promise<void> {
     const t0 = Date.now();
     const grab = await this.deps.grab(trigger);
-    if (!current()) return; // screen closed or another trigger came in
+    if (!current()) {
+      // Screen closed or another trigger came in: the frame isn't read, but still handed back.
+      if (grab.ok) await this.deps.done?.(grab.file);
+      return;
+    }
     if (!grab.ok) {
       this.deps.onEvent({ kind: "skipped", trigger, reason: grab.reason });
       return;
@@ -162,7 +166,10 @@ export class SealWhisperWatcher implements ToolModule {
 
   private async captureSelection(current: () => boolean, attempt = 1): Promise<void> {
     const grab = await this.deps.grab("select");
-    if (!current()) return;
+    if (!current()) {
+      if (grab.ok) await this.deps.done?.(grab.file);
+      return;
+    }
     if (!grab.ok) {
       this.deps.onEvent({ kind: "skipped", trigger: "select", reason: grab.reason });
       return;

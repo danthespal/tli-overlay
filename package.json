@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Torchlight: Infinite reward overlay - log engine and mechanic modules",
+  "author": "Arsenic",
+  "license": "MIT",
   "type": "module",
   "main": "dist/overlay/main.js",
   "scripts": {
@@ -19,7 +21,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "bundle": "node bundle.mjs",
-    "dist": "node bundle.mjs && electron-builder --win portable --publish never"
+    "dist": "node bundle.mjs && electron-builder --win zip --publish never"
   },
   "build": {
     "appId": "io.github.danthespal.tli-overlay",
@@ -50,11 +52,18 @@
       "output": "release"
     },
     "win": {
-      "target": "portable"
+      "target": "zip"
     },
-    "portable": {
-      "artifactName": "TLI-Overlay-${version}.exe"
-    }
+    "electronLanguages": [
+      "en-US"
+    ],
+    "artifactName": "TLI-Overlay-${version}-win-x64.${ext}",
+    "extraFiles": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      }
+    ]
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

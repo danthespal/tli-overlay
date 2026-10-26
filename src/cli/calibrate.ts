@@ -4,23 +4,14 @@
 //   npm run calibrate -- --dry   -> print only
 //   npm run calibrate -- --history <dir>
 
-import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { ADVISOR_CONFIG, loadAdvisorConfig } from "../modules/black-sail/advisor.js";
 import { calibrate, impliedBase, memoryValue, type ChestLike, type FlameLike, type SalvageLike, type ScreenLike } from "../modules/black-sail/calibrate.js";
 import { SALVAGE_FILE } from "../modules/black-sail/salvageTracker.js";
-import { writeConfig } from "../modules/black-sail/autoCalibrate.js";
+import { jsonl, writeConfig } from "../modules/black-sail/autoCalibrate.js";
 import { MATERIALS } from "../modules/black-sail/modifiers.js";
 
 const MIN_CHESTS = 10;
-
-async function jsonl<T>(path: string): Promise<T[]> {
-  try {
-    return (await readFile(path, "utf8")).split("\n").filter(Boolean).map((l) => JSON.parse(l) as T);
-  } catch {
-    return [];
-  }
-}
 
 async function main() {
   const dry = process.argv.includes("--dry");

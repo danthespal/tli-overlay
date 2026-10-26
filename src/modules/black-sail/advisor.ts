@@ -66,7 +66,8 @@ export interface AdvisorConfig {
   calibration?: { time: string; chests: number; screens: number; flames: number; salvaged?: number };
 }
 
-export const DEFAULT_GOAL = "fe";
+/** The goal a cycle starts with (the player picks per cycle). "fe" (plain FE weights) is internal only, not offered. */
+export const DEFAULT_GOAL = "scraps";
 
 /**
  * The config the advisor should use for a goal: the focus material counts `focusBoost` times its
@@ -89,7 +90,14 @@ export async function loadAdvisorConfig(path = ADVISOR_CONFIG): Promise<AdvisorC
     if (err.code === "ENOENT" && path !== DEFAULT_ADVISOR_CONFIG) return readFile(DEFAULT_ADVISOR_CONFIG, "utf8");
     throw err;
   });
-  return JSON.parse(text) as AdvisorConfig;
+  const cfg = JSON.parse(text) as AdvisorConfig;
+  // The goals are the product's, not calibrated: a calibrated copy next to the exe keeps the
+  // list it was made with, so it always comes from the shipped config (e.g. Best FE removed).
+  if (path !== DEFAULT_ADVISOR_CONFIG) {
+    const shipped = await readFile(DEFAULT_ADVISOR_CONFIG, "utf8").then((t) => JSON.parse(t) as AdvisorConfig, () => null);
+    if (shipped?.goals) cfg.goals = shipped.goals;
+  }
+  return cfg;
 }
 
 export interface SetValue {

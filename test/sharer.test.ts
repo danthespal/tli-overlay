@@ -103,6 +103,21 @@ describe("Sharer", () => {
     expect(calls.at(-1)!.body.records[0].data).toEqual({ cycle: 9 });
   });
 
+  it("keeps the rest of the queue when a line was cut off by a crash", async () => {
+    const settings: Settings = { share: true };
+    const a = sharer(settings);
+    answer = "offline";
+    a.add("chest", { cycle: 1 });
+    a.add("chest", { cycle: 2 });
+    await a.flush();
+    await new Promise((r) => setTimeout(r, 50));
+    const { appendFile } = await import("node:fs/promises");
+    await appendFile(join(dir, "share-queue.jsonl"), '{"uid":"abc","install":'); // cut-off last line
+    const b = sharer(settings);
+    await b.load();
+    expect(b.pending).toBe(2);
+  });
+
   it("turning sharing off drops what is still queued", async () => {
     const s = sharer({ share: true });
     s.add("chest", { cycle: 1 });
