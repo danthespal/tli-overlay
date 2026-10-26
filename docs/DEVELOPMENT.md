@@ -67,7 +67,7 @@ At first start the panel asks once whether to share anonymous Black Sail data. N
 
 **Report a wrong read** (Ctrl+Shift+R, or the panel's link) is separate: it shows the last frame and what was read, and sends them with the player's note only when they press Send.
 
-The collector is a Cloudflare Worker (`worker/`, setup in its README). `.github/workflows/collect.yml` pulls the records into `data/collected/` every 6 hours and refits the advisor on them; `npm run reports` downloads the reports locally.
+The collector is a Cloudflare Worker (`worker/`, setup in its README). `.github/workflows/collect.yml` pulls the records every 6 hours, refits the advisor on them and commits only the totals (`data/collected/summary.md`, `advisor-config.json`; raw records never go into the public repo); `npm run reports` downloads the reports locally.
 
 ## Release
 

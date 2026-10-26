@@ -10,3 +10,5 @@ data/shared.jsonl
 data/shared-export.json
 data/reports/
 .env.collect
+data/collected/raw/
+data/collected/state.json

@@ -1,6 +1,7 @@
-# Pulls what players shared from the collector (worker/) into data/collected/, refits the advisor
-# on all of it (data/collected/advisor-config.json, summary.md) and commits that. Reports
-# (free text and pictures) are never committed: read them locally with `npm run reports`.
+# Pulls what players shared from the collector (worker/), refits the advisor on all of it and
+# commits only the totals: data/collected/summary.md and advisor-config.json. The raw records
+# stay in the collector (the repo is public; git ignores data/collected/raw/), so each run pulls
+# them all again. Reports (free text and pictures) are never committed: `npm run reports`.
 # Runs every 6 hours, or on demand: gh workflow run collect.yml
 # Needs the repo secrets COLLECT_URL (the Worker's address) and COLLECT_TOKEN (its EXPORT_TOKEN).
 name: Collect
@@ -43,7 +44,7 @@ jobs:
       - name: Commit
         if: always()
         run: |
-          git add data/collected
+          git add data/collected/summary.md data/collected/advisor-config.json
           if git diff --cached --quiet; then
             echo "No new records."
             exit 0

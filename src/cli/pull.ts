@@ -1,7 +1,7 @@
 // Pulls what players shared from the collector (worker/) into data/collected/, then refits the
 // advisor on everyone's history and writes a summary, for review:
-//   data/collected/raw/<received date>.jsonl   every record, as the collector stored it
-//   data/collected/state.json                  the last record id pulled
+//   data/collected/raw/<received date>.jsonl   every record, as the collector stored it (local only)
+//   data/collected/state.json                  the last record id pulled (local only)
 //   data/collected/advisor-config.json         the shipped config refitted on all players' data
 //   data/collected/summary.md                  players, versions, screens, reader health, the refit
 // The shipped config (data/black-sail/advisor-config.json) is never changed: copy the refit over
@@ -10,7 +10,9 @@
 //   npm run pull              new records, then the refit     (COLLECT_URL, COLLECT_TOKEN)
 //   npm run pull -- --refit   only the refit, on what is already pulled
 //
-// The repo's collect workflow runs it every 6 hours with the token from its secrets.
+// The repo's collect workflow runs it every 6 hours with the token from its secrets. The repo is
+// public, so the raw records are never committed (git ignores raw/ and state.json): each run starts
+// empty, pulls every record and commits only the totals (summary.md, advisor-config.json).
 
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";

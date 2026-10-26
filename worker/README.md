@@ -11,7 +11,7 @@ No accounts, no addresses stored. Each address may upload 60 times a minute, 5,0
 
 ## Where the data goes
 
-- `.github/workflows/collect.yml` runs every 6 hours: `npm run pull` appends new records to `data/collected/raw/<date>.jsonl`, refits the advisor on all of them (`data/collected/advisor-config.json`) and writes `data/collected/summary.md`, then commits that. The shipped config is never changed by it.
+- `.github/workflows/collect.yml` runs every 6 hours: `npm run pull` pulls every record, refits the advisor on all of them (`data/collected/advisor-config.json`) and writes `data/collected/summary.md`, then commits only those two files. The raw records are never committed (the repo is public): locally they go to `data/collected/raw/`, which git ignores. The shipped config is never changed by it.
 - Reports are never committed. Read them with `npm run reports` (same `COLLECT_URL` / `COLLECT_TOKEN`), which downloads them into `data/reports/`, ignored by git. Both values are in `tool/.env.collect` (ignored by git); load them first, e.g. in Git Bash `set -a; . ./.env.collect; set +a`.
 
 ## Setup (once)
