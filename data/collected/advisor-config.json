@@ -47,47 +47,18 @@
     "flames": [
       {
         "group": "Boss Whisper",
-        "minRarity": "white",
-        "p": 0.075
-      },
-      {
-        "group": "Boss Whisper",
         "minRarity": "blue",
-        "p": 0.081
-      },
-      {
-        "group": "Boss Whisper",
-        "minRarity": "purple",
-        "p": 0.098
-      },
-      {
-        "group": "Wealth",
-        "minRarity": "white",
-        "p": 0.306
-      },
-      {
-        "group": "Wealth",
-        "minRarity": "blue",
-        "p": 0.289
-      },
-      {
-        "group": "Wealth",
-        "minRarity": "purple",
-        "p": 0.127
+        "p": 1
       }
     ],
-    "doubledRate": 0.161,
+    "doubledRate": 0,
     "tieFraction": 0.03
   },
   "goals": {
-    "_note": "Chosen per cycle in the overlay. A focus goal multiplies its material's weight by focusBoost and every other material (and other loot) by othersFactor, so the advisor stacks that material and uses the rest only to break ties. 'fe' = plain FE weights. alwaysFull: invitations keep their full FE value under any goal (rare: 1 Craving in 8 chests, 18 FE; player guidance: take a good invitation card whatever the goal).",
+    "_note": "Chosen per cycle in the overlay. A focus goal multiplies its material's weight by focusBoost and every other material (and other loot) by othersFactor, so the advisor stacks that material and uses the rest only to break ties. ('fe', plain FE weights, is internal only: not offered as a goal.) alwaysFull: invitations keep their full FE value under any goal (rare: 1 Craving in 8 chests, 18 FE; player guidance: take a good invitation card whatever the goal).",
     "focusBoost": 10,
     "othersFactor": 0.2,
     "list": [
-      {
-        "id": "fe",
-        "label": "Best FE"
-      },
       {
         "id": "scraps",
         "label": "Scraps",
@@ -114,10 +85,10 @@
     ]
   },
   "calibration": {
-    "time": "1970-01-01T00:00:00.000Z",
+    "time": "2026-10-26T10:21:19.446Z",
     "chests": 0,
-    "screens": 0,
-    "flames": 0,
+    "screens": 2,
+    "flames": 2,
     "salvaged": 0
   }
 }
