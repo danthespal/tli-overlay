@@ -1,0 +1,92 @@
+[
+  {
+    "id": "boss_whisper",
+    "icon": "boss_blue",
+    "kind": "whisper",
+    "text": "After defeating Void Pirates, a Boss Whisper is guaranteed to appear among the selectable Seal Whispers"
+  },
+  {
+    "id": "boss_whisper_magic",
+    "icon": "boss_purple",
+    "kind": "whisper",
+    "text": "After defeating Void Pirates, a Boss Whisper of Magic quality or higher is guaranteed to appear among the selectable Seal Whispers"
+  },
+  {
+    "id": "boss_whisper_rare",
+    "icon": "boss_gold",
+    "kind": "whisper",
+    "text": "After defeating Pirates, a Boss Whisper of Rare quality or higher is guaranteed to appear among the selectable Seal Whispers"
+  },
+  {
+    "id": "wealth",
+    "icon": "wealth_blue",
+    "kind": "whisper",
+    "text": "After defeating Void Pirates, a Whisper of Wealth is guaranteed to appear among the selectable Seal Whispers"
+  },
+  {
+    "id": "wealth_magic",
+    "icon": "wealth_purple",
+    "kind": "whisper",
+    "text": "After defeating Void Pirates, a Whisper of Wealth of Magic quality or higher is guaranteed to appear among the selectable Seal Whispers"
+  },
+  {
+    "id": "wealth_rare",
+    "icon": "wealth_gold",
+    "kind": "whisper",
+    "text": "After defeating Pirates, a Whisper of Wealth of Rare quality or higher is guaranteed to appear among the selectable Seal Whispers"
+  },
+  {
+    "id": "legendary_gear",
+    "icon": "swirl_blue",
+    "kind": "loot",
+    "text": "20% chance for Void Pirates to drop 1 additional pieces of Legendary gear"
+  },
+  {
+    "id": "rare_armor",
+    "icon": "crystal_white",
+    "kind": "loot",
+    "text": "Void Pirates defeated will drop 6 additional pieces of Rare armor"
+  },
+  {
+    "id": "rare_trinkets",
+    "icon": "crystal_white",
+    "kind": "loot",
+    "text": "Void Pirates defeated will drop 6 additional Rare trinkets"
+  },
+  {
+    "id": "hero_memories",
+    "icon": "hook_white",
+    "kind": "loot",
+    "text": "100% chance for Void Pirates to drop 1 additional Hero Memories"
+  },
+  {
+    "id": "flame_fuel",
+    "icon": "s_white",
+    "kind": "loot",
+    "text": "50% chance for Void Pirates to drop 1 additional Flame Fuel"
+  },
+  {
+    "id": "embers",
+    "icon": "s_white",
+    "kind": "loot",
+    "text": "50% chance for Void Pirates to drop 1 additional Embers"
+  },
+  {
+    "id": "rare_weapons",
+    "icon": "crystal_white",
+    "kind": "loot",
+    "text": "Void Pirates defeated will drop 6 additional Rare weapons"
+  },
+  {
+    "id": "energy_cores",
+    "icon": "flame_white",
+    "kind": "loot",
+    "text": "100% chance for Void Pirates to drop 2 additional Energy Cores"
+  },
+  {
+    "id": "fluorescent_memories",
+    "icon": "s_white",
+    "kind": "loot",
+    "text": "50% chance for Void Pirates to drop 1 additional Fluorescent Memories"
+  }
+]

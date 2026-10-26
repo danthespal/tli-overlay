@@ -6,9 +6,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { APP_DIR } from "../paths.js";
 
 const run = promisify(execFile);
-const SCRIPT = resolve(import.meta.dirname, "../../scripts/ocr/windows-ocr.ps1");
+const SCRIPT = resolve(APP_DIR, "scripts/ocr/windows-ocr.ps1");
 
 export interface OcrLine {
   text: string;

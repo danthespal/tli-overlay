@@ -1,4 +1,4 @@
-// Seal Whisper effect table (mechanics/black-sail/data/seal-whisper-effects.json) and
+// Seal Whisper effect table (data/black-sail/seal-whisper-effects.json) and
 // matching of OCR'd card text against it.
 //
 // OCR quirks this handles (seen on real cards):
@@ -7,12 +7,10 @@
 // So we compare the text with all digits removed, and compare the numbers separately.
 
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join } from "node:path";
+import { APP_DIR } from "../../paths.js";
 
-export const EFFECTS_TABLE = resolve(
-  import.meta.dirname,
-  "../../../../mechanics/black-sail/data/seal-whisper-effects.json",
-);
+export const EFFECTS_TABLE = join(APP_DIR, "data/black-sail/seal-whisper-effects.json");
 
 export type Rarity = "white" | "blue" | "purple" | "orange";
 

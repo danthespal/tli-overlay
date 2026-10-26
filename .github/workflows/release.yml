@@ -1,0 +1,37 @@
+# Push a tag like v0.2.0 (matching "version" in package.json) to build the portable exe and
+# publish it, zipped, as a GitHub Release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run dist
+
+      - name: Zip the exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release/*.exe | Select-Object -First 1
+          Compress-Archive -Path $exe.FullName -DestinationPath "release/$($exe.BaseName).zip"
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" (Get-ChildItem release/*.zip).FullName --title "${{ github.ref_name }}" --generate-notes

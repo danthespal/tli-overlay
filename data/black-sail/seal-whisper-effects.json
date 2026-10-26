@@ -1,0 +1,754 @@
+[
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "white",
+  "timemark": "100-100",
+  "effect": "+9% Void Sea Treasure Base Drop Quantity",
+  "source": "20261025043107_1.jpg",
+  "wiki_effect": "+9% Void Sea Treasure Base Drop Quantity",
+  "wiki_doubled": "+18% Void Sea Treasure Base Drop Quantity"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "blue",
+  "timemark": "100-100",
+  "effect": "+14% Void Sea Treasure Base Drop Quantity",
+  "source": "20261025043107_1.jpg",
+  "wiki_effect": "+14% Void Sea Treasure Base Drop Quantity",
+  "wiki_doubled": "+28% Void Sea Treasure Base Drop Quantity"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "purple",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043107_1.jpg",
+  "wiki_effect": "+18% Void Sea Treasure Base Drop Quantity",
+  "wiki_doubled": "+36% Void Sea Treasure Base Drop Quantity"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043107_1.jpg",
+  "wiki_effect": "+36% Void Sea Treasure Base Drop Quantity",
+  "wiki_doubled": "+72% Void Sea Treasure Base Drop Quantity"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "white",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043111_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "blue",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043111_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "purple",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043111_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043111_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "white",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043114_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "blue",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043114_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "purple",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043114_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043114_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "white",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043116_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "blue",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043116_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "purple",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043116_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043116_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "white",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043119_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "blue",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043119_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "purple",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043119_1.jpg"
+ },
+ {
+  "group": "Switch pool (Timemark 100-100)",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043119_1.jpg"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+14% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "source": "20261025043122_1.jpg",
+  "wiki_effect": "+14% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+28% chance for Memory Scraps to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+35% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043122_1.jpg",
+  "wiki_effect": "+35% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+70% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "Void Sea Treasures drop 10 additional Memory Scrap(s)",
+  "source": "20261025043122_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 10 additional Memory Scrap(s)",
+  "wiki_doubled": "Void Sea Treasures drop 19 additional Memory Scrap(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "20% chance for 49 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "source": "20261025043122_1.jpg",
+  "wiki_effect": "20% chance for 49 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 97 additional Memory Scrap(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+35% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "source": "20261025043124_1.jpg",
+  "wiki_effect": "+35% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+70% chance for Memory Threads to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+21% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043124_1.jpg",
+  "wiki_effect": "+21% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+42% additional Memory Thread Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "Void Sea Treasures drop 1 additional Memory Thread(s)",
+  "source": "20261025043124_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 1 additional Memory Thread(s)",
+  "wiki_doubled": "Void Sea Treasures drop 2 additional Memory Thread(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "20% chance for 3 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "source": "20261025043124_1.jpg",
+  "wiki_effect": "20% chance for 3 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 6 additional Memory Thread(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+21% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "source": "20261025043126_1.jpg",
+  "wiki_effect": "+21% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+42% chance for Memory Scraps to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+53% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043126_1.jpg",
+  "wiki_effect": "+53% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+105% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "Void Sea Treasures drop 15 additional Memory Scrap(s)",
+  "source": "20261025043126_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 15 additional Memory Scrap(s)",
+  "wiki_doubled": "Void Sea Treasures drop 29 additional Memory Scrap(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "20% chance for 73 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "source": "20261025043126_1.jpg",
+  "wiki_effect": "20% chance for 73 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 146 additional Memory Scrap(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+53% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "source": "20261025043128_1.jpg",
+  "wiki_effect": "+53% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+106% chance for Memory Threads to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+32% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043128_1.jpg",
+  "wiki_effect": "+32% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+64% additional Memory Thread Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "Void Sea Treasures drop 1 additional Memory Thread(s)",
+  "source": "20261025043128_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 1 additional Memory Thread(s)",
+  "wiki_doubled": "Void Sea Treasures drop 2 additional Memory Thread(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "20% chance for 4 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "source": "20261025043128_1.jpg",
+  "wiki_effect": "20% chance for 4 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 8 additional Memory Thread(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+28% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "source": "20261025043131_1.jpg",
+  "wiki_effect": "+28% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+56% chance for Memory Scraps to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+70% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043131_1.jpg",
+  "wiki_effect": "+70% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+140% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "Void Sea Treasures drop 19 additional Memory Scrap(s)",
+  "source": "20261025043131_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 19 additional Memory Scrap(s)",
+  "wiki_doubled": "Void Sea Treasures drop 39 additional Memory Scrap(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "20% chance for 97 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "source": "20261025043131_1.jpg",
+  "wiki_effect": "20% chance for 97 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 194 additional Memory Scrap(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+70% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "source": "20261025043133_1.jpg",
+  "wiki_effect": "+70% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+140% chance for Memory Threads to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+42% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043133_1.jpg",
+  "wiki_effect": "+42% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+84% additional Memory Thread Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "Void Sea Treasures drop 1 additional Memory Thread(s)",
+  "source": "20261025043133_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 1 additional Memory Thread(s)",
+  "wiki_doubled": "Void Sea Treasures drop 2 additional Memory Thread(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "20% chance for 5 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "source": "20261025043133_1.jpg",
+  "wiki_effect": "20% chance for 5 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 10 additional Memory Thread(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043135_1.jpg",
+  "wiki_effect": "+56% chance for Memory Scraps to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+112% chance for Memory Scraps to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": "8-10",
+  "effect": "+140% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043135_1.jpg",
+  "wiki_effect": "+140% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+280% additional Memory Scrap Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043135_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 39 additional Memory Scrap(s)",
+  "wiki_doubled": "Void Sea Treasures drop 78 additional Memory Scrap(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043135_1.jpg",
+  "wiki_effect": "20% chance for 194 additional Memory Scrap(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 388 additional Memory Scrap(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043137_1.jpg",
+  "wiki_effect": "+140% chance for Memory Threads to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+280% chance for Memory Threads to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043137_1.jpg",
+  "wiki_effect": "+84% additional Memory Thread Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+168% additional Memory Thread Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043137_1.jpg",
+  "wiki_effect": "Void Sea Treasures drop 2 additional Memory Thread(s)",
+  "wiki_doubled": "Void Sea Treasures drop 4 additional Memory Thread(s)"
+ },
+ {
+  "group": "Wealth",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043137_1.jpg",
+  "wiki_effect": "20% chance for 10 additional Memory Thread(s) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 20 additional Memory Thread(s) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+28% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "source": "20261025043139_1.jpg",
+  "wiki_effect": "+28% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+56% chance for Hero Memories to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+21% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043139_1.jpg",
+  "wiki_effect": "+21% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+42% additional Hero Memory Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "white",
+  "timemark": "8-10",
+  "effect": "2 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "source": "20261025043139_1.jpg",
+  "wiki_effect": "2 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "wiki_doubled": "4 additional Hero Memory(ies) drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "white",
+  "timemark": "8-10",
+  "effect": "20% chance for 8 additional Hero Memory(ies) to drop from Void Sea Treasures",
+  "source": "20261025043139_1.jpg",
+  "wiki_effect": "20% chance for 8 additional Hero Memory(ies) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 17 additional Hero Memory(ies) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+42% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "source": "20261025043141_1.jpg",
+  "wiki_effect": "+42% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+84% chance for Hero Memories to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+32% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043141_1.jpg",
+  "wiki_effect": "+32% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+64% additional Hero Memory Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "blue",
+  "timemark": "8-10",
+  "effect": "3 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "source": "20261025043141_1.jpg",
+  "wiki_effect": "3 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "wiki_doubled": "6 additional Hero Memory(ies) drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "blue",
+  "timemark": "8-10",
+  "effect": "20% chance for 12 additional Hero Memory(ies) to drop from Void Sea Treasures",
+  "source": "20261025043141_1.jpg",
+  "wiki_effect": "20% chance for 12 additional Hero Memory(ies) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 25 additional Hero Memory(ies) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+56% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "source": "20261025043143_1.jpg",
+  "wiki_effect": "+56% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+112% chance for Hero Memories to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+42% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043143_1.jpg",
+  "wiki_effect": "+42% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+84% additional Hero Memory Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "purple",
+  "timemark": "8-10",
+  "effect": "4 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "source": "20261025043143_1.jpg",
+  "wiki_effect": "4 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "wiki_doubled": "8 additional Hero Memory(ies) drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "purple",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043143_1.jpg",
+  "wiki_effect": "20% chance for 17 additional Hero Memory(ies) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 33 additional Hero Memory(ies) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043145_1.jpg",
+  "wiki_effect": "+112% chance for Hero Memories to appear among base Void Sea Treasure drops",
+  "wiki_doubled": "+224% chance for Hero Memories to appear among base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "orange",
+  "timemark": "8-10",
+  "effect": "+84% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "source": "20261025043145_1.jpg",
+  "wiki_effect": "+84% additional Hero Memory Drop Quantity in base Void Sea Treasure drops",
+  "wiki_doubled": "+168% additional Hero Memory Drop Quantity in base Void Sea Treasure drops"
+ },
+ {
+  "group": "Armament",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043145_1.jpg",
+  "wiki_effect": "8 additional Hero Memory(ies) drop from Void Sea Treasures",
+  "wiki_doubled": "16 additional Hero Memory(ies) drop from Void Sea Treasures"
+ },
+ {
+  "group": "Armament",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043145_1.jpg",
+  "wiki_effect": "20% chance for 33 additional Hero Memory(ies) to drop from Void Sea Treasures",
+  "wiki_doubled": "20% chance for 66 additional Hero Memory(ies) to drop from Void Sea Treasures"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+14% Void Sea Treasure Drop Quantity",
+  "source": "20261025043147_1.jpg",
+  "wiki_effect": "+14% Void Sea Treasure Drop Quantity",
+  "wiki_doubled": "+28% Void Sea Treasure Drop Quantity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+25% Void Sea Treasure Drop Rarity",
+  "source": "20261025043147_1.jpg",
+  "wiki_effect": "+25% Void Sea Treasure Drop Rarity",
+  "wiki_doubled": "+49% Void Sea Treasure Drop Rarity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+21% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "source": "20261025043147_1.jpg",
+  "wiki_effect": "+21% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+42% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "white",
+  "timemark": "1-10",
+  "effect": "+21% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "source": "20261025043147_1.jpg",
+  "wiki_effect": "+21% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+42% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+21% Void Sea Treasure Drop Quantity",
+  "source": "20261025043150_1.jpg",
+  "wiki_effect": "+21% Void Sea Treasure Drop Quantity",
+  "wiki_doubled": "+42% Void Sea Treasure Drop Quantity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+37% Void Sea Treasure Drop Rarity",
+  "source": "20261025043150_1.jpg",
+  "wiki_effect": "+37% Void Sea Treasure Drop Rarity",
+  "wiki_doubled": "+74% Void Sea Treasure Drop Rarity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+32% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "source": "20261025043150_1.jpg",
+  "wiki_effect": "+32% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+64% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "+32% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "source": "20261025043150_1.jpg",
+  "wiki_effect": "+32% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+64% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+28% Void Sea Treasure Drop Quantity",
+  "source": "20261025043151_1.jpg",
+  "wiki_effect": "+28% Void Sea Treasure Drop Quantity",
+  "wiki_doubled": "+56% Void Sea Treasure Drop Quantity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+49% Void Sea Treasure Drop Rarity",
+  "source": "20261025043151_1.jpg",
+  "wiki_effect": "+49% Void Sea Treasure Drop Rarity",
+  "wiki_doubled": "+98% Void Sea Treasure Drop Rarity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+42% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "source": "20261025043151_1.jpg",
+  "wiki_effect": "+42% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+84% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "+42% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "source": "20261025043151_1.jpg",
+  "wiki_effect": "+42% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+84% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043154_1.jpg",
+  "wiki_effect": "+56% Void Sea Treasure Drop Quantity",
+  "wiki_doubled": "+112% Void Sea Treasure Drop Quantity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043154_1.jpg",
+  "wiki_effect": "+98% Void Sea Treasure Drop Rarity",
+  "wiki_doubled": "+196% Void Sea Treasure Drop Rarity"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043154_1.jpg",
+  "wiki_effect": "+84% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+84% chance for Memory Scraps dropped from Void Sea Treasures to be multiplied by 3 time(s)"
+ },
+ {
+  "group": "Wonder",
+  "rarity": "orange",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043154_1.jpg",
+  "wiki_effect": "+84% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 2 time(s)",
+  "wiki_doubled": "+84% chance for Memory Threads dropped from Void Sea Treasures to be multiplied by 3 time(s)"
+ },
+ {
+  "group": "Boss Whisper",
+  "rarity": "white",
+  "timemark": null,
+  "effect": null,
+  "source": "20261025043159_1.jpg"
+ },
+ {
+  "group": "Boss Whisper",
+  "rarity": "blue",
+  "timemark": "3-10",
+  "effect": "10% chance for 1 additional Void Sea Invitation(s) to drop from Void Sea Treasures",
+  "source": "20261025043159_1.jpg"
+ },
+ {
+  "group": "Boss Whisper",
+  "rarity": "purple",
+  "timemark": "5-10",
+  "effect": "20% chance for 1 additional Void Sea Invitation(s) to drop from Void Sea Treasures",
+  "source": "20261025043159_1.jpg"
+ },
+ {
+  "group": "Boss Whisper",
+  "rarity": "orange",
+  "timemark": "8-10",
+  "effect": "40% chance for 1 additional Void Sea Invitation(s) to drop from Void Sea Treasures",
+  "source": "20261025043159_1.jpg"
+ }
+]

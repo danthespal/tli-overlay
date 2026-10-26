@@ -3,11 +3,14 @@
 // Model and assumptions: mechanics/black-sail/09-card-advisor.md.
 
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join } from "node:path";
+import { APP_DIR, PACKAGED, USER_DIR } from "../../paths.js";
 import type { EffectEntry, Rarity } from "./effects.js";
 import { MATERIALS, parseModifier, type Material, type Modifier } from "./modifiers.js";
 
-export const ADVISOR_CONFIG = resolve(import.meta.dirname, "../../../../mechanics/black-sail/data/advisor-config.json");
+/** The shipped config. The exe calibrates a copy of it next to itself (ADVISOR_CONFIG). */
+export const DEFAULT_ADVISOR_CONFIG = join(APP_DIR, "data/black-sail/advisor-config.json");
+export const ADVISOR_CONFIG = PACKAGED ? join(USER_DIR, "advisor-config.json") : DEFAULT_ADVISOR_CONFIG;
 export const PICKS_PER_CYCLE = 6;
 export const RARITIES: Rarity[] = ["white", "blue", "purple", "orange"];
 /** The table group of the card offered by the Switch button (always available, any screen). */
@@ -81,7 +84,12 @@ export function configForGoal(cfg: AdvisorConfig, goalId: string): AdvisorConfig
 }
 
 export async function loadAdvisorConfig(path = ADVISOR_CONFIG): Promise<AdvisorConfig> {
-  return JSON.parse(await readFile(path, "utf8")) as AdvisorConfig;
+  // First run of the exe: no calibrated copy yet, start from the shipped one.
+  const text = await readFile(path, "utf8").catch((err: NodeJS.ErrnoException) => {
+    if (err.code === "ENOENT" && path !== DEFAULT_ADVISOR_CONFIG) return readFile(DEFAULT_ADVISOR_CONFIG, "utf8");
+    throw err;
+  });
+  return JSON.parse(text) as AdvisorConfig;
 }
 
 export interface SetValue {

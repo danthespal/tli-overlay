@@ -10,8 +10,9 @@ import type { LogLine } from "../engine/logLine.js";
 import type { ToolModule } from "../engine/module.js";
 import type { OcrPage, Region } from "../ocr/windowsOcr.js";
 import type { GrabResult } from "./windowCapture.js";
+import { APP_DIR } from "../paths.js";
 
-const SCRIPT = resolve(import.meta.dirname, "../../scripts/worker.ps1");
+const SCRIPT = resolve(APP_DIR, "scripts/worker.ps1");
 
 export interface WindowRect {
   x: number;

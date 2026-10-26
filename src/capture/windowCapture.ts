@@ -4,9 +4,10 @@
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
+import { APP_DIR } from "../paths.js";
 
 const run = promisify(execFile);
-const SCRIPT = resolve(import.meta.dirname, "../../scripts/capture/capture-window.ps1");
+const SCRIPT = resolve(APP_DIR, "scripts/capture/capture-window.ps1");
 
 export type GrabResult =
   /** x, y: the game's client area on screen (physical pixels). */

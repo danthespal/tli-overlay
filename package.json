@@ -4,6 +4,7 @@
   "private": true,
   "description": "Torchlight: Infinite reward overlay - log engine and mechanic modules",
   "type": "module",
+  "main": "dist/overlay/main.js",
   "scripts": {
     "audit": "tsx src/cli/audit.ts",
     "read-cards": "tsx src/cli/read-cards.ts",
@@ -14,12 +15,51 @@
     "overlay": "electron src/overlay/start.mjs",
     "build-flame-icons": "tsx src/cli/build-flame-icons.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bundle": "node bundle.mjs",
+    "dist": "node bundle.mjs && electron-builder --win portable --publish never"
+  },
+  "build": {
+    "appId": "io.github.danthespal.tli-overlay",
+    "productName": "TLI Overlay",
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts",
+        "to": "scripts"
+      },
+      {
+        "from": "data/black-sail",
+        "to": "data/black-sail"
+      },
+      {
+        "from": "data/tessdata-fast",
+        "to": "data/tessdata-fast"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/tesseract.js/**",
+      "node_modules/tesseract.js-core/**"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "TLI-Overlay-${version}.exe"
+    }
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/pngjs": "^6.0.5",
     "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"

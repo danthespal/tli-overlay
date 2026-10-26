@@ -13,8 +13,9 @@ import { resolve } from "node:path";
 import type { OcrPage, OcrRegion, Region } from "../../ocr/windowsOcr.js";
 import { numbers, similarity, template } from "./effects.js";
 import { joinPieces } from "./sealWhisperReader.js";
+import { APP_DIR } from "../../paths.js";
 
-const DATA = resolve(import.meta.dirname, "../../../../mechanics/black-sail/data");
+const DATA = resolve(APP_DIR, "data/black-sail");
 export const FLAME_EFFECTS = resolve(DATA, "flame-effects.json");
 export const FLAME_ICONS = resolve(DATA, "flame-icons.json");
 

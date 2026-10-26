@@ -17,9 +17,10 @@ import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { createScheduler, createWorker, PSM, type Scheduler } from "tesseract.js";
 import { CHECK_REGIONS, pillSlot } from "../modules/black-sail/pill.js";
+import { APP_DIR } from "../paths.js";
 import type { OcrLine, OcrPage, OcrRegion, Region } from "./windowsOcr.js";
 
-export const TESSDATA = resolve(import.meta.dirname, "../../data/tessdata-fast");
+export const TESSDATA = resolve(APP_DIR, "data/tessdata-fast");
 
 /** Decoded RGBA pixels. */
 export interface Pixels {

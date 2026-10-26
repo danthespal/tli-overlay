@@ -12,6 +12,7 @@ import type { GrabResult } from "../capture/windowCapture.js";
 import { CaptureWorker, warmOnScreens } from "../capture/worker.js";
 import { GameCapture } from "../capture/gameCapture.js";
 import { LOG_DIR } from "../config.js";
+import { USER_DIR } from "../paths.js";
 import { Engine } from "../engine/engine.js";
 import { LogTailer } from "../engine/logReader.js";
 import { configForGoal, DEFAULT_GOAL, loadAdvisorConfig, setScore, type Tier } from "../modules/black-sail/advisor.js";
@@ -147,7 +148,7 @@ async function main() {
   // disk. What was read (small JSON lines) is always kept in data/dataset/<date>/events.jsonl.
   // --dataset (development): keep the frames too, so readers can be checked against them.
   const keepFrames = process.argv.includes("--dataset");
-  const dataset = new Dataset(resolve(import.meta.dirname, "../../data/dataset"));
+  const dataset = new Dataset(join(USER_DIR, "dataset"));
   await dataset.init();
   const scratch = join(tmpdir(), "tli-overlay");
   await mkdir(scratch, { recursive: true });
@@ -196,7 +197,7 @@ async function main() {
 
   const demoMode = process.argv.includes("--demo");
   // The demo must not touch the real cycle state, so it gets a throwaway history folder.
-  const historyDir = demoMode ? join(tmpdir(), "tli-overlay-demo-history") : resolve(import.meta.dirname, "../../data/history");
+  const historyDir = demoMode ? join(tmpdir(), "tli-overlay-demo-history") : join(USER_DIR, "history");
   const pickLabel = (c: TrackedCard) => ({ rarity: c.rarity, label: c.unread ? "unread card" : label(c.effect) });
   let lastRead: SealWhisperRead | null = null;
 

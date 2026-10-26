@@ -28,8 +28,13 @@ npm run backfill-salvage          # development: read Hero Memory salvages out o
 
 The watcher grabs **one frame only when the log says a choice screen opened, a flame was clicked, a card was clicked, or Switch was pressed**. Nothing is captured at any other time. Frames come from a **share of the game window** (Electron window capture, like tartarus-simulator): the game's own pixels, so nothing drawn on top is in the picture and the game needn't be in front. The share is started when a choice screen opens and stopped 20 s after the last frame (`src/capture/gameCapture.ts`, hidden page `src/overlay/capture.html`); a warm frame takes ~30 ms. When Windows won't share the window (e.g. the game runs elevated and the overlay doesn't), the fallback is a screen copy of the client area, which needs the game in front. Text is read by **Tesseract.js** (WebAssembly; the English model ships in `data/tessdata-fast`, so no Windows language pack is needed): per-card crops upscaled 2x, raw and binarised, three engines in parallel, ~0.8 s per card screen, ~0.4 s per flame screen (`src/ocr/tesseractOcr.ts`). `TLI_OCR=windows` switches back to Windows OCR for comparison. Window rectangles and the fallback copy run in one PowerShell helper (`scripts/worker.ps1`) with the same start/stop. `npm run overlay -- --hide-from-captures` content-protects the overlay window (out of screenshots and streams); off by default because on a transparent window it can leave the overlay undrawn. `npm run overlay -- --probe-capture <dir>` saves one frame of each kind with the game running.
 
-Log folder default is in `src/config.ts`; override with `TLI_LOG_DIR`.
+The log folder is found from Steam's libraries or the standalone launcher (`src/config.ts`); override with `TLI_LOG_DIR`.
 Audit reports go to `reports/` (JSON + Markdown).
+
+## Release
+
+`npm run dist` builds a single portable exe in `release/`. Pushing a tag such as `v0.2.0` (same as `version` in `package.json`) makes the GitHub Action build it and publish it, zipped, as a Release.
+The exe keeps the player's files (history, dataset, calibrated advisor config) in a `data` folder next to itself.
 
 ## Layout
 
