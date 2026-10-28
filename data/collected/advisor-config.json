@@ -48,35 +48,35 @@
       {
         "group": "Boss Whisper",
         "minRarity": "white",
-        "p": 0.095
+        "p": 0.1
       },
       {
         "group": "Boss Whisper",
         "minRarity": "blue",
-        "p": 0.123
+        "p": 0.122
       },
       {
         "group": "Boss Whisper",
         "minRarity": "purple",
-        "p": 0.123
+        "p": 0.122
       },
       {
         "group": "Wealth",
         "minRarity": "white",
-        "p": 0.257
+        "p": 0.256
       },
       {
         "group": "Wealth",
         "minRarity": "blue",
-        "p": 0.235
+        "p": 0.233
       },
       {
         "group": "Wealth",
         "minRarity": "purple",
-        "p": 0.168
+        "p": 0.167
       }
     ],
-    "doubledRate": 0.242,
+    "doubledRate": 0.239,
     "tieFraction": 0.03
   },
   "goals": {
@@ -110,10 +110,10 @@
     ]
   },
   "calibration": {
-    "time": "2026-10-28T11:19:30.037Z",
+    "time": "2026-10-28T20:06:12.688Z",
     "chests": 27,
-    "screens": 178,
-    "flames": 179,
+    "screens": 180,
+    "flames": 180,
     "salvaged": 80
   }
 }
