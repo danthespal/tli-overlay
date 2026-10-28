@@ -1,17 +1,17 @@
 # Collected Black Sail data
 
-1003 records from 4 installs, 8 sessions. Newest record: 2026-10-27T22:26:55.185Z.
+1050 records from 4 installs, 8 sessions. Newest record: 2026-10-27T22:55:24.998Z.
 
 ## Records
 
 | kind | records |
 |---|---|
-| cards | 429 |
-| flames | 186 |
-| flameChosen | 160 |
-| picked | 160 |
-| salvage | 27 |
-| chest | 26 |
+| cards | 448 |
+| flames | 194 |
+| flameChosen | 168 |
+| picked | 168 |
+| salvage | 29 |
+| chest | 28 |
 | session | 8 |
 | capture | 6 |
 | goal | 1 |
@@ -37,8 +37,8 @@
 
 ## Reader health
 
-- Cards read: 991, without a matching effect: 0 (0.0%)
-- Flames put in: 160, uncertain: 1
+- Cards read: 1036, without a matching effect: 0 (0.0%)
+- Flames put in: 168, uncertain: 1
 
 | frames not read, because | times |
 |---|---|
@@ -46,13 +46,13 @@
 
 ## Advisor refit on all players (data/collected/advisor-config.json)
 
-24 complete chests, 159 screens, 159 flames, 61 memories salvaged.
+26 complete chests, 167 screens, 167 flames, 61 memories salvaged.
 
 | base amount | shipped | all players |
 |---|---|---|
-| scraps | 78 | 78 |
+| scraps | 78 | 76 |
 | threads | 3.4 | 3.5 |
-| heroMemories | 13.5 | 14.5 |
+| heroMemories | 13.5 | 14.4 |
 | invitations | 0 | 0 |
-| doubled screens | 0.171 | 0.245 |
+| doubled screens | 0.171 | 0.251 |
 | Hero Memory FE | 0.051 | 0.058 |
