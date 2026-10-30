@@ -43,6 +43,7 @@ import { readSealWhisperPage, type SealWhisperRead } from "../modules/black-sail
 import { SealWhisperWatcher, type SealWhisperEvent } from "../modules/black-sail/sealWhisperWatcher.js";
 import { SalvageTracker, scanLogsForSalvage } from "../modules/black-sail/salvageTracker.js";
 import { autoCalibrate } from "../modules/black-sail/autoCalibrate.js";
+import { CycleScanner, cycleFromLogs } from "../modules/black-sail/cycleScan.js";
 import { ocrImages } from "../ocr/windowsOcr.js";
 import { TesseractOcr, type ScreenKind } from "../ocr/tesseractOcr.js";
 
@@ -182,7 +183,10 @@ async function main() {
   // The last frame and what was read from it are kept (one file, in the temp folder) for a
   // report ("that was wrong"); every other frame is deleted once read.
   let lastFrame: { screen: string; path: string; read: Record<string, unknown> | null; used: boolean } | null = null;
-  const drop = (file: string) => rm(file, { force: true });
+  // Frames of the "Seal Whispers Owned" panel are kept in the dataset (rare, one per panel opening):
+  // samples for its reader, which has seen few layouts yet.
+  const keepOwned = (trigger: string) => trigger === "owned";
+  const drop = (file: string) => (file.includes("_owned.jpg") ? Promise.resolve() : rm(file, { force: true }));
   const done = keepFrames
     ? undefined
     : async (file: string) => {
@@ -331,7 +335,7 @@ async function main() {
 
   /** Grabs a frame and remembers where the game window is, so drawings line up with it. */
   const grabAs = (screenName: string) => async (trigger: string): Promise<GrabResult> => {
-    const path = keepFrames ? dataset.framePath(screenName, trigger) : join(scratch, `${screenName}_${Date.now()}.jpg`);
+    const path = keepFrames || keepOwned(trigger) ? dataset.framePath(screenName, trigger) : join(scratch, `${screenName}_${Date.now()}.jpg`);
     if (lastFrame?.used && !keepFrames) void drop(lastFrame.path);
     lastFrame = { screen: screenName, path, read: null, used: false };
     let g = await capture.grab(path);
@@ -508,7 +512,8 @@ async function main() {
     state.setScore = e.setScore;
     state.switchHint = e.switchOutlook ? { chance: e.switchOutlook.chance } : null;
     state.screen = "cards";
-    state.status = `Pick ${tracker.currentPicks.length + 1}/6`;
+    const unread = tracker.currentPicks.filter((p) => p.id === "log").length;
+    state.status = `Pick ${tracker.currentPicks.length + 1}/6${unread ? ` · open "Seal Whispers Owned" to read ${unread} earlier pick${unread > 1 ? "s" : ""}` : ""}`;
   }
 
   const onCards = (e: SealWhisperEvent) => {
@@ -522,6 +527,21 @@ async function main() {
       lastRead = e.read;
       state.view = e.read.view === "switch" ? "switch" : "three";
       tracker.onCards(e.read); // -> advice -> send
+      return;
+    }
+    if (e.kind === "owned") {
+      record("owned", {
+        frame: e.file ? basename(e.file) : undefined, // kept in the dataset either way
+        count: e.read.count,
+        whispers: e.read.whispers.map((w) => ({ rarity: w.rarity, doubled: w.doubled, ocr: w.text, effect: w.match?.entry.text ?? null })),
+      });
+      // -> advice (when cards are on screen) -> send
+      if (tracker.onOwned(e.read)) {
+        state.picks = tracker.currentPicks.map(pickLabel);
+        refreshSetScore();
+        state.status = `Read ${e.read.whispers.length} Seal Whispers from the panel`;
+        send();
+      }
       return;
     }
     if (e.kind === "selected") {
@@ -548,7 +568,18 @@ async function main() {
   const flameText = (effect: FlameEffect | null, icon: string | null) =>
     effect ? FLAME_LABEL[effect.id] ?? effect.id : `${effects.filter((x) => x.icon === icon).map((x) => FLAME_LABEL[x.id] ?? x.id).join(" / ") || "unknown"} ?`;
 
+  // The flame put in, until the game logs its round's altar id (selectAltarId) ~15 s later: the
+  // pairs, in black-sail-altar-ids.jsonl, show which flame each id stands for.
+  let lastChosen: { at: number; entry: { effect: string | null; text: string; certain: boolean } } | null = null;
   const onFlames = (e: FlameEvent) => {
+    if (e.kind === "altar") {
+      const chosen = lastChosen && Date.now() - lastChosen.at < 60_000 ? lastChosen.entry : null;
+      lastChosen = null; // one id per flame
+      const pair = { time: new Date().toISOString(), altarId: e.id, effect: chosen?.effect ?? null, text: chosen?.text ?? null, certain: chosen?.certain ?? false };
+      record("altarId", pair);
+      appendFile(join(historyDir, "black-sail-altar-ids.jsonl"), JSON.stringify(pair) + "\n").catch((err) => console.error(`altar history: ${err}`));
+      return;
+    }
     if (e.kind === "flames") {
       record("flames", {
         trigger: e.trigger,
@@ -584,6 +615,7 @@ async function main() {
       state.status = `Put in: ${what}${e.certain ? "" : " (uncertain)"}`;
       const entry = { time: new Date().toISOString(), effect: e.effect?.id ?? null, text: e.selectedText, numbers: e.numbers, certain: e.certain };
       record("flameChosen", entry);
+      lastChosen = { at: Date.now(), entry };
       appendFile(join(historyDir, "black-sail-flames.jsonl"), JSON.stringify(entry) + "\n").catch((err) => console.error(`flame history: ${err}`));
     } else if (e.kind === "skipped") state.status = `Not read: ${e.reason}`;
     else {
@@ -707,6 +739,7 @@ async function main() {
   // a stack already in the bag (Threads, Compasses) is counted after a restart.
   const follow = async (path: string) => {
     logDetail.reset();
+    const scan = new CycleScanner();
     const t = new LogTailer(
       path,
       (line) => {
@@ -719,6 +752,26 @@ async function main() {
         prime: (line) => {
           logDetail.note(line);
           engine.prime(line);
+          scan.line(line);
+        },
+        // Started mid-cycle: catch up on picks and chests from the logs, and read a screen already open.
+        primed: async () => {
+          try {
+            const cycle = await cycleFromLogs(scan, path, tracker.lastSaved);
+            if (!cycle) console.log("cycle: no Terminal visit in the logs, saved cycle kept");
+            else if (tracker.reconcile(cycle)) {
+              console.log(`cycle: caught up from the logs, ${cycle.picks.length} picks since the last Terminal visit`);
+              state.cycle = tracker.summary().cycle;
+              state.picks = tracker.currentPicks.map(pickLabel);
+              refreshSetScore();
+              state.askGoal = tracker.currentPicks.length === 0;
+              state.status = `Caught up from the game log: pick ${tracker.currentPicks.length + 1}/6`;
+              send();
+            }
+            if (scan.openScreen && (await gameRunning())) engine.feed(scan.openScreen);
+          } catch (err) {
+            console.error(`cycle catch-up: ${err instanceof Error ? err.stack : err}`);
+          }
         },
         onRotate: () => logDetail.reset(),
       },

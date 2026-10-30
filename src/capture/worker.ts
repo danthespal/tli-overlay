@@ -4,6 +4,7 @@
 // exists only while a Black Sail choice is being made. It never captures on its own.
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { LogLine } from "../engine/logLine.js";
@@ -44,6 +45,11 @@ export class CaptureWorker {
   private proc: ChildProcessWithoutNullStreams | undefined;
   private ready: Promise<void> | undefined;
   private readonly pending = new Map<number, Pending>();
+  /**
+   * The current process's grabs given up on (timed out): their frame, written late, is deleted when
+   * the reply comes. One set per process, so it goes away with it.
+   */
+  private abandoned = new Set<number>();
   private nextId = 1;
   private idleTimer: NodeJS.Timeout | undefined;
   private readonly idleMs: number;
@@ -112,6 +118,7 @@ export class CaptureWorker {
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.proc = proc;
+    const abandoned = (this.abandoned = new Set<number>());
     // Writing to a process that just died fails asynchronously (EPIPE) as an "error" event on
     // stdin; without a listener that is an uncaught exception that takes the whole app down. The
     // request itself fails through its write callback or the process's exit.
@@ -136,7 +143,11 @@ export class CaptureWorker {
         }
         const id = msg.id as number | undefined;
         const p = id !== undefined ? this.pending.get(id) : undefined;
-        if (!p) return;
+        if (!p) {
+          // Nobody reads a late frame: without this it stays in the temp folder until the next start.
+          if (id !== undefined && abandoned.delete(id) && msg.ok && typeof msg.file === "string") void rm(msg.file, { force: true }).catch(() => undefined);
+          return;
+        }
         this.pending.delete(id!);
         clearTimeout(p.timer);
         if (msg.error) p.reject(new Error(String(msg.error)));
@@ -190,11 +201,13 @@ export class CaptureWorker {
   private async request(body: Record<string, unknown>): Promise<unknown> {
     await this.ensure();
     const proc = this.proc!;
+    const abandoned = this.abandoned;
     const id = this.nextId++;
     clearTimeout(this.idleTimer);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        if (body.op === "grab") abandoned.add(id);
         reject(new Error(`capture worker: no reply to ${String(body.op)} in ${this.timeoutMs} ms`));
         this.touchIdle();
       }, this.timeoutMs);

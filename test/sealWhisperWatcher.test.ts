@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { parseLogLine } from "../src/engine/logLine.js";
 import { loadEffectTable, type EffectEntry } from "../src/modules/black-sail/effects.js";
 import { matchInGroup } from "../src/modules/black-sail/sealWhisperReader.js";
+import { DIAMOND_REGIONS } from "../src/modules/black-sail/ownedReader.js";
 import { confirmSlot, hasCardText, pillSlot, SealWhisperWatcher, type SealWhisperEvent } from "../src/modules/black-sail/sealWhisperWatcher.js";
 import type { OcrPage } from "../src/ocr/windowsOcr.js";
 
@@ -10,6 +11,7 @@ const OPEN = "[2026.10.25-02.26.22:551][ 25]TLLua: Display: [Game] TipMsgShowMgr
 const SWITCH = "[2026.10.25-02.26.30:854][218]TLGame: Display: [Game] UIButton@ normal-click BtnShowGVAC";
 const RETURN = "[2026.10.25-02.26.34:877][797]TLGame: Display: [Game] UIButton@ normal-click BtnReturnNVAC";
 const CLOSE = "[2026.10.24-13.36.39:168][202]TLLua: Display: [Game] TipMsgShowMgr@DispatchPageRunChange PageName = VoidPort , PageRunState = Destory ";
+const OWNED_CLICK = "[2026.10.28-20.23.32:594][736]TLGame: Display: [Game] UIButton@ normal-click BtnOpenCurAffix";
 const OTHER = "[2026.10.25-02.26.19:621][618]TLLua: Display: [Game] ItemChange@ ProtoName=PickItems start";
 
 // OCR pieces from the real screenshots.
@@ -41,6 +43,22 @@ const buttons = (states: ("dark" | "pill")[]) =>
     const wing = s === "pill" ? { gray: new Array(256).fill(30), color: [30, 30, 30] as [number, number, number], bright: 0, max: 180, lit: 0.02 } : { ...centre, max: 35, lit: 0 };
     return [centre, wing, wing];
   });
+
+/** The "Seal Whispers Owned" panel (as in the 2026-10-28 sample): diamonds lit at their entry's middle. */
+function ownedPage(entries: { y: number; color: [number, number, number]; lines: string[] }[]): OcrPage {
+  const dark = { gray: [], color: [40, 40, 40] as [number, number, number], bright: 0, max: 60, lit: 0 };
+  const regions = DIAMOND_REGIONS.map(([, ry]) => {
+    const e = entries.find((x) => Math.abs(ry + 8 - x.y) <= 8);
+    return e ? { ...dark, color: e.color, lit: 0.7 } : dark;
+  });
+  const lines = entries.flatMap((e) => e.lines.map((text, i) => line(text, 1579, e.y - (e.lines.length * 27) / 2 + i * 27, 280)));
+  return { ...page([...lines, line("3 / 6", 1665, 1025, 42)]), regions };
+}
+const OWNED = ownedPage([
+  { y: 260, color: [205, 220, 242], lines: ["Void Sea Treasures drop", "10 additional Memory", "Scrap(s)"] },
+  { y: 408, color: [175, 228, 254], lines: ["10% chance for 1", "additional Void Sea", "Invitation(s) to drop from", "Void Sea Treasures"] },
+  { y: 524, color: [252, 209, 52], lines: ["40% chance for 1", "additional Void Sea", "Invitation(s) to drop from", "Void Sea Treasures"] },
+]);
 
 let table: EffectEntry[];
 beforeAll(async () => {
@@ -98,6 +116,30 @@ describe("SealWhisperWatcher", () => {
       "switch:switch",
       "return:three",
     ]);
+  });
+
+  it("reads the Seal Whispers Owned panel when it is toggled, with its own grab", async () => {
+    pages = [THREE, OWNED];
+    feed(OPEN);
+    await vi.advanceTimersByTimeAsync(1000);
+    feed(OWNED_CLICK);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(grab).toHaveBeenLastCalledWith("owned");
+    const e = events.at(-1)!;
+    expect(e.kind === "owned" && [e.read.count, e.read.whispers.map((w) => `${w.rarity}/${w.match?.entry.group}`)]).toEqual([
+      3,
+      ["white/Wealth", "blue/Boss Whisper", "orange/Boss Whisper"],
+    ]);
+  });
+
+  it("reports nothing when the toggle closed the panel (one more look first)", async () => {
+    pages = [THREE];
+    feed(OPEN);
+    await vi.advanceTimersByTimeAsync(1000);
+    feed(OWNED_CLICK);
+    await vi.advanceTimersByTimeAsync(600 + 500);
+    expect(grab).toHaveBeenCalledTimes(3); // open + 2 panel looks
+    expect(events.map((e) => e.kind)).toEqual(["read"]);
   });
 
   it("does not grab if the screen closes before the cards settle", async () => {

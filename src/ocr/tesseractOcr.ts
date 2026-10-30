@@ -8,6 +8,7 @@
 //   cards  : one crop per card (title + effect text), read raw and binarised at once (6 jobs)
 //   select : the three Confirm-label bands plus one card crop (to see the screen is still there)
 //   flames : the selected flame's text under the ring
+//   owned  : the "Seal Whispers Owned" panel's text column and its "N / 6" count
 // Validated on 2026-10-25 against the recorded Windows OCR readings: 169/169 cards (0 wrong),
 // flames 134/137 (the 3 were the old recordings' mistakes), selection frames all explained.
 
@@ -16,6 +17,7 @@ import { basename, resolve } from "node:path";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { createScheduler, createWorker, PSM, type Scheduler } from "tesseract.js";
+import { OWNED_COUNT, OWNED_TEXT } from "../modules/black-sail/ownedReader.js";
 import { CHECK_REGIONS, pillSlot } from "../modules/black-sail/pill.js";
 import { APP_DIR } from "../paths.js";
 import type { OcrLine, OcrPage, OcrRegion, Region } from "./windowsOcr.js";
@@ -30,7 +32,7 @@ export interface Pixels {
 }
 
 /** Which Black Sail screen the frame shows, so only its text is read. */
-export type ScreenKind = "cards" | "select" | "flames";
+export type ScreenKind = "cards" | "select" | "flames" | "owned";
 
 /** Card text columns (1920x1080): centres of the three cards; the Switch view's one card is in the middle. */
 const CARD_CX = [518, 960, 1415];
@@ -199,16 +201,33 @@ export interface TesseractOptions {
   lang?: string;
   /** Parallel engines (one crop each); 3 = the three cards at once. */
   workers?: number;
+  /** Stop the engines this long after the last read (default 5 min); the next read starts them again. */
+  idleMs?: number;
 }
+
+const IDLE_MS = 300_000;
 
 export class TesseractOcr {
   private scheduler: Promise<Scheduler> | undefined;
+  /** Reads in progress: the engines are never stopped under one. */
+  private active = 0;
+  private idleTimer: NodeJS.Timeout | undefined;
 
   constructor(private readonly opts: TesseractOptions = {}) {}
 
   /** Starts the engines now (~0.2 s each), so the first read doesn't pay for it. */
   warm(): void {
     void this.get().catch(() => undefined);
+    this.touchIdle();
+  }
+
+  /** Their memory is given back between Black Sail screens, not held for the whole session. */
+  private touchIdle(): void {
+    clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      if (!this.active) void this.stop();
+    }, this.opts.idleMs ?? IDLE_MS);
+    this.idleTimer.unref(); // never keeps a command-line run alive on its own
   }
 
   private get(): Promise<Scheduler> {
@@ -287,8 +306,19 @@ export class TesseractOcr {
 
   /** Reads one decoded frame for a screen kind: text pieces plus the requested region statistics. */
   async readPixels(px: Pixels, file: string, regions: Region[] = [], kind: ScreenKind = "cards"): Promise<OcrPage> {
+    this.active++;
+    try {
+      return await this.read(px, file, regions, kind);
+    } finally {
+      this.active--;
+      this.touchIdle();
+    }
+  }
+
+  private async read(px: Pixels, file: string, regions: Region[], kind: ScreenKind): Promise<OcrPage> {
     let lines: OcrLine[];
     if (kind === "flames") lines = await this.crop(px, FLAME_CROP, PSM.SINGLE_BLOCK);
+    else if (kind === "owned") lines = (await Promise.all([this.crop(px, OWNED_TEXT, PSM.SINGLE_BLOCK), this.crop(px, OWNED_COUNT, PSM.SINGLE_LINE)])).flat();
     else if (kind === "select") {
       // One raw card crop (the middle card is there in both views) so the watcher can tell the
       // screen is still open; the Confirm labels only when the pill test on the pixels is unclear.
@@ -310,6 +340,7 @@ export class TesseractOcr {
   }
 
   async stop(): Promise<void> {
+    clearTimeout(this.idleTimer);
     const s = this.scheduler;
     this.scheduler = undefined;
     // A start that failed has nothing to terminate.

@@ -98,7 +98,8 @@ export class Sharer {
     } else {
       this.writes = this.writes.then(() => this.append(this.queueFile, [record])).catch((err) => this.log(`queue: ${err}`));
     }
-    if (this.queue.length >= MAX_RECORDS) this.schedule(0);
+    // A full batch goes at once, unless a failed upload is waiting out its retry delay.
+    if (this.queue.length >= MAX_RECORDS && this.retry === RETRY_MIN) this.schedule(0);
     else this.schedule(this.o.delayMs ?? 20_000);
   }
 
@@ -193,6 +194,13 @@ export class Sharer {
 
   /** Deletes everything this install shared, on the collector and here. */
   async forget(): Promise<string> {
+    // What hasn't gone up yet never will: dropped first, then an upload already on its way is
+    // waited for, so the delete below covers it too. Sharing stays as it is for new records.
+    this.queue = [];
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    await this.busy;
+    await this.rewriteQueue();
     try {
       const res = await (this.o.fetch ?? fetch)(`${this.o.endpoint}/v1/forget`, {
         method: "POST",

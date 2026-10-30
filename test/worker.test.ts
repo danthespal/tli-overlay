@@ -1,6 +1,7 @@
 // The capture/OCR worker process: same results as the one-shot scripts, fast once warm, stops
 // itself when idle, and comes back for the next request. Runs the real PowerShell (Windows only).
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -64,6 +65,33 @@ describe("CaptureWorker", () => {
       await new Promise((r) => setTimeout(r, 1500)); // the first one's exit has fired by now
       await expect(next).resolves.toBeDefined(); // its request wasn't failed by the old exit
       expect(w.running).toBe(true); // and it isn't forgotten (would run on, orphaned)
+    } finally {
+      w.stop();
+    }
+  }, 30_000);
+
+  it("deletes the frame of a grab it gave up on, once the late reply comes", async () => {
+    // A stand-in for worker.ps1 that answers a grab only after writing its frame 0.8 s later.
+    const script = join(scratch, "slow-worker.ps1");
+    await writeFile(
+      script,
+      [
+        "[Console]::Out.WriteLine('{\"ready\":true}'); [Console]::Out.Flush()",
+        "while ($null -ne ($line = [Console]::In.ReadLine())) {",
+        "  $req = $line | ConvertFrom-Json",
+        "  if ($req.op -eq 'quit') { exit 0 }",
+        "  Start-Sleep -Milliseconds 800",
+        "  Set-Content -Path $req.out -Value 'frame'",
+        "  [Console]::Out.WriteLine((@{ id = $req.id; ok = $true; file = $req.out; width = 1; height = 1 } | ConvertTo-Json -Compress)); [Console]::Out.Flush()",
+        "}",
+      ].join("\n"),
+    );
+    const w = new CaptureWorker({ script, timeoutMs: 200, idleMs: 60_000 });
+    const out = join(scratch, "late.jpg");
+    try {
+      await expect(w.grab(out)).rejects.toThrow(/no reply to grab/);
+      await new Promise((r) => setTimeout(r, 2000)); // the frame is written, then the reply comes
+      expect(existsSync(out)).toBe(false);
     } finally {
       w.stop();
     }

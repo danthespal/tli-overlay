@@ -5,6 +5,8 @@
 //   BtnReturnNVAC          -> back to the 3 cards: reuse the earlier read (no grab)
 //   BtnSelect              -> a card was clicked: grab, work out which card is selected;
 //                             if no card clearly is (glow not up yet), one more grab a bit later
+//   BtnOpenCurAffix        -> "Seal Whispers Owned" toggled: grab, read the panel (the picks so
+//                             far); nothing found = the click closed it
 //   VoidPort ... Hide      -> handbook opened over it: cancel a pending read, hide the drawings
 //   VoidPort ... Destory   -> screen closed: cancel anything pending
 // Nothing is captured at any other time.
@@ -15,6 +17,7 @@ import { TriggerScheduler } from "../../capture/triggerScheduler.js";
 import type { GrabResult } from "../../capture/windowCapture.js";
 import type { OcrPage, OcrRegion, Region } from "../../ocr/windowsOcr.js";
 import { similarity, template, type EffectEntry } from "./effects.js";
+import { DIAMOND_REGIONS, readOwnedPage, type OwnedRead } from "./ownedReader.js";
 import { readSealWhisperPage, type SealWhisperRead, type Slot } from "./sealWhisperReader.js";
 
 const OPENED = /^TipMsgShowMgr@DispatchPageRunChange PageName = VoidPort , PageRunState = Run/;
@@ -24,17 +27,20 @@ const HIDDEN = /^TipMsgShowMgr@DispatchPageRunChange PageName = VoidPort , PageR
 const SWITCH = /^UIButton@ normal-click BtnShowGVAC/;
 const RETURN = /^UIButton@ normal-click BtnReturnNVAC/;
 const SELECT = /^UIButton@ normal-click BtnSelect/;
+const OWNED = /^UIButton@ normal-click BtnOpenCurAffix/;
 
 // Which card is selected: the "pill" test on the check-button regions, see pill.ts.
 export { CHECK_REGIONS, pillSlot } from "./pill.js";
 import { CHECK_REGIONS, pillSlot, SLOTS } from "./pill.js";
 
-export type Trigger = "open" | "switch" | "return" | "select";
+export type Trigger = "open" | "switch" | "return" | "select" | "owned";
 
 export type SealWhisperEvent =
   | { kind: "read"; trigger: Trigger; read: SealWhisperRead; ms: number; file?: string }
   /** A card was clicked. `slot` is null when the frame doesn't make the selection clear. */
   | { kind: "selected"; slot: Slot | null; brightness: number[]; outline: number[]; file?: string }
+  /** The "Seal Whispers Owned" panel, read. */
+  | { kind: "owned"; read: OwnedRead; file?: string }
   | { kind: "skipped"; trigger: Trigger; reason: string }
   /** Covered by the handbook: draw nothing until the next "read". */
   | { kind: "hidden" }
@@ -44,13 +50,13 @@ export interface WatcherDeps {
   /** Grabs one frame; `trigger` names it (e.g. for the dataset). */
   grab: (trigger: Trigger) => Promise<GrabResult>;
   /** `kind` tells a crop-based engine which screen the frame shows ("cards" or "select"). */
-  ocr: (paths: string[], regions?: Region[], kind?: "cards" | "select" | "flames") => Promise<OcrPage[]>;
+  ocr: (paths: string[], regions?: Region[], kind?: "cards" | "select" | "flames" | "owned") => Promise<OcrPage[]>;
   /** Called with the frame file once it has been read (e.g. delete it). Omit to keep frames. */
   done?: (file: string) => Promise<void>;
   table: EffectEntry[];
   onEvent: (e: SealWhisperEvent) => void;
   /** Waits before grabbing. Defaults tuned for the card animations; 2 tries per read trigger. */
-  settleMs?: { open: number; switch: number; retry: number; select?: number; selectRetry?: number };
+  settleMs?: { open: number; switch: number; retry: number; select?: number; selectRetry?: number; owned?: number };
 }
 
 // select: the player confirms 0.6-1.0 s after the card click (66 picks, 2026-10-25, median 0.9 s).
@@ -58,7 +64,8 @@ export interface WatcherDeps {
 // before it was drawn (outline 0-3.5% instead of 10-20%): 250 ms is after the pill, before the
 // Confirm. selectRetry: when that frame shows no pill, one more this long AFTER THE CLICK
 // (not after the first result, which the OCR can delay by ~0.5 s).
-const DEFAULT_SETTLE = { open: 1200, switch: 700, retry: 800, select: 250, selectRetry: 750 };
+// owned: the panel slides in; one retry (`retry` later) when the first frame shows no Whisper.
+const DEFAULT_SETTLE = { open: 1200, switch: 700, retry: 800, select: 250, selectRetry: 750, owned: 600 };
 
 export class SealWhisperWatcher implements ToolModule {
   readonly id = "black-sail-seal-whisper";
@@ -67,12 +74,14 @@ export class SealWhisperWatcher implements ToolModule {
   private readonly scheduler = new TriggerScheduler();
   /** Separate, so a quick card click doesn't cancel the screen's own read. */
   private readonly selectScheduler = new TriggerScheduler();
+  /** Separate too: the panel read mustn't cancel a card read, nor the other way round. */
+  private readonly ownedScheduler = new TriggerScheduler();
   private open = false;
   private view: "three" | "switch" = "three";
   private lastThree: SealWhisperRead | undefined;
   /** When the last card click was logged (the retry grab is timed from it). */
   private lastSelectAt = 0;
-  private readonly settle: { open: number; switch: number; retry: number; select?: number; selectRetry?: number };
+  private readonly settle: { open: number; switch: number; retry: number; select?: number; selectRetry?: number; owned?: number };
 
   constructor(private readonly deps: WatcherDeps) {
     this.settle = deps.settleMs ?? DEFAULT_SETTLE;
@@ -100,12 +109,16 @@ export class SealWhisperWatcher implements ToolModule {
       this.selectScheduler.run(this.settle.select ?? DEFAULT_SETTLE.select, (current) =>
         this.guard("select", current, () => this.captureSelection(current)),
       );
+    } else if (this.open && OWNED.test(t)) {
+      this.ownedScheduler.run(this.settle.owned ?? DEFAULT_SETTLE.owned, (current) => this.guard("owned", current, () => this.captureOwned(current)));
     } else if (HIDDEN.test(t)) {
       this.scheduler.cancel();
+      this.ownedScheduler.cancel();
       this.deps.onEvent({ kind: "hidden" });
     } else if (CLOSED.test(t)) {
       this.open = false;
       this.scheduler.cancel();
+      this.ownedScheduler.cancel();
       // The card-click read is NOT cancelled: its frame is grabbed ~0.35 s after the click, while
       // the screen closes 2.7-5 s later (after Confirm). The pick tracker waits for this result.
       this.lastThree = undefined;
@@ -162,6 +175,32 @@ export class SealWhisperWatcher implements ToolModule {
     }
     if (read.view === "three") this.lastThree = read;
     this.deps.onEvent({ kind: "read", trigger, read, ms: Date.now() - t0, file: grab.file });
+  }
+
+  private async captureOwned(current: () => boolean, attempt = 1): Promise<void> {
+    const grab = await this.deps.grab("owned");
+    if (!current()) {
+      if (grab.ok) await this.deps.done?.(grab.file);
+      return;
+    }
+    if (!grab.ok) {
+      this.deps.onEvent({ kind: "skipped", trigger: "owned", reason: grab.reason });
+      return;
+    }
+    let read: OwnedRead;
+    try {
+      const [page] = await this.deps.ocr([grab.file], DIAMOND_REGIONS, "owned");
+      read = readOwnedPage(page!, this.deps.table);
+    } finally {
+      await this.deps.done?.(grab.file);
+    }
+    if (!current()) return;
+    if (!read.whispers.length) {
+      // Still sliding in, or the click closed the panel: one more look, then nothing to report.
+      if (attempt < 2) this.ownedScheduler.run(this.settle.retry, (cur) => this.guard("owned", cur, () => this.captureOwned(cur, attempt + 1)), false);
+      return;
+    }
+    this.deps.onEvent({ kind: "owned", read, file: grab.file });
   }
 
   private async captureSelection(current: () => boolean, attempt = 1): Promise<void> {

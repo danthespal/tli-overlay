@@ -181,6 +181,20 @@ describe("LogTailer", () => {
     }
   });
 
+  it("starts no polling when stopped while it was still reading the old lines", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tli-"));
+    const file = join(dir, "UE_game.log");
+    await writeFile(file, "a\nb\n");
+    const tailer: LogTailer = new LogTailer(file, () => undefined, { fromEnd: true, pollMs: 60_000, prime: () => tailer.stop() });
+    try {
+      await tailer.start();
+      expect((tailer as unknown as { timer: unknown }).timer).toBeUndefined();
+    } finally {
+      tailer.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("goes on after a line handler throws, and delivers nothing once stopped", async () => {
     const dir = await mkdtemp(join(tmpdir(), "tli-"));
     const file = join(dir, "UE_game.log");

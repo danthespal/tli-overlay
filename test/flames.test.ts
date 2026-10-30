@@ -67,6 +67,14 @@ describe("FlameWatcher", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("reports the round's altar id, logged after the screen closed", () => {
+    // Real line (2026-10-28), ~14 s after the flame screen's Confirm.
+    feed("[2026.10.28-20.13.52:898][166]TLGame: Display: [Game] UMapGamePlayAction_SeasonAltar msgToServer pendingRouteIds num:3, selectAltarId:200001!");
+    feed("[2026.10.28-20.11.48:857][802]TLGame: Display: [Game] UMapGamePlayAction_SeasonAltar msgToServer pendingAltarIds num:2, affixAltarIds num:1");
+    expect(events).toEqual([{ kind: "altar", id: 200001 }]);
+    expect(grab).not.toHaveBeenCalled();
+  });
+
   it("knows most flames from their icons alone, and learns the two S flames by clicking them", async () => {
     frames = [
       frame(RING_B, "After defeating Pirates, a Whisper Of ot Rare quality or higher is guaranteed appear among the selectable Seal Whispers"),
@@ -109,6 +117,25 @@ describe("FlameWatcher", () => {
     await vi.advanceTimersByTimeAsync(400); // the click's frame is read: Embers selected
     expect(events.filter((e) => e.kind === "chosen")).toMatchObject([{ effect: { id: "embers" }, certain: true }]);
     expect(events.at(-1)).toEqual({ kind: "closed" });
+  });
+
+  it("reports a still-waiting Confirm as uncertain when the screen opens again, and leaves the new screen open", async () => {
+    const CONFIRM = "[2026.10.25-03.13.11:801][433]TLGame: Display: [Game] UIButton@ normal-click BtnConfirm";
+    frames = [
+      frame(RING_B, "After defeating Pirates, a Whisper Of ot Rare quality or higher is guaranteed appear among the selectable Seal Whispers"),
+      frame(RING_B, "chance for Void Pirates to drop 1 additional Embers"),
+    ];
+    feed(OPEN);
+    await vi.advanceTimersByTimeAsync(1000);
+    feed(CLICK);
+    feed(CONFIRM); // waits for the click's frame
+    feed(CLOSE);
+    feed(OPEN); // a new screen before that frame was read
+    expect(events.filter((e) => e.kind === "chosen")).toMatchObject([{ effect: { id: "wealth_rare" }, certain: false }]);
+    expect(events.at(-1)).toEqual({ kind: "closed" }); // the old screen's close
+    await vi.advanceTimersByTimeAsync(4000); // the new screen's read; the old Confirm's wait is over
+    expect(events.filter((e) => e.kind === "chosen")).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({ kind: "flames", trigger: "open", read: { selected: { effect: { id: "embers" } } } });
   });
 
   it("reports at once when nothing is still being read", async () => {

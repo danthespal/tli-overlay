@@ -161,7 +161,9 @@ export async function scanLogsForSalvage(logDir: string, historyDir: string): Pr
   const next: Record<string, number> = {};
   for (const name of names) {
     const path = join(logDir, name);
-    const size = (await stat(path)).size;
+    // Gone since the listing (the game renamed it on start): the next scan sees its new name.
+    const size = await stat(path).then((s) => s.size, () => null);
+    if (size === null) continue;
     next[name] = size;
     // The live log is rotated to a backup on each game start, so a backup is scanned once in full;
     // the live log is read when it grew (from the top: its old bytes were a different session only

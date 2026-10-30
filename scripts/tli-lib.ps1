@@ -129,9 +129,11 @@ function Grab-GameWindow([string]$Out, [string]$ProcessName = 'torchlight_infini
     $w = $r.R - $r.L; $hgt = $r.B - $r.T
     if ($w -le 0 -or $hgt -le 0) { return @{ ok = $false; reason = 'game window has no size' } }
     if ([TliWin]::GetForegroundWindow() -ne $h) { return @{ ok = $false; reason = 'game window is not in front' } }
-    $bmp = New-Object System.Drawing.Bitmap $w, $hgt
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    # Made inside the try: a failure making the Graphics must not leave the Bitmap undisposed in the warm worker.
+    $bmp = $null; $g = $null
     try {
+        $bmp = New-Object System.Drawing.Bitmap $w, $hgt
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
         $g.CopyFromScreen($p.X, $p.Y, 0, 0, (New-Object System.Drawing.Size $w, $hgt))
         if ($Out -match '\.jpe?g$') {
             # JPEG quality 92: ~0.3 MB per 1080p frame instead of ~1.5 MB PNG; text still OCRs cleanly.
@@ -142,7 +144,7 @@ function Grab-GameWindow([string]$Out, [string]$ProcessName = 'torchlight_infini
         } else {
             $bmp.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png)
         }
-    } finally { $g.Dispose(); $bmp.Dispose() }
+    } finally { if ($g) { $g.Dispose() }; if ($bmp) { $bmp.Dispose() } }
     return @{ ok = $true; file = $Out; x = $p.X; y = $p.Y; width = $w; height = $hgt }
 }
 

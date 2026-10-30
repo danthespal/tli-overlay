@@ -45,6 +45,22 @@ describe("TesseractOcr", () => {
     }
   }, 60_000);
 
+  it("stops its engines when idle, never under a read, and starts them again for the next one", async () => {
+    const file = join(SCREENS, "anchor", (await readdir(join(SCREENS, "anchor"))).find((f) => /^voidbeacon_flame-.*\.jpe?g$/i.test(f))!);
+    const idle = new TesseractOcr({ idleMs: 100, workers: 1 });
+    const engines = () => (idle as unknown as { scheduler: unknown }).scheduler;
+    try {
+      const [first] = await idle.ocrImages([file], [], "flames");
+      expect(engines()).toBeDefined();
+      await new Promise((r) => setTimeout(r, 400));
+      expect(engines()).toBeUndefined(); // stopped after 100 ms without a read
+      const [again] = await idle.ocrImages([file], [], "flames");
+      expect(again!.lines.map((l) => l.text)).toEqual(first!.lines.map((l) => l.text));
+    } finally {
+      await idle.stop();
+    }
+  }, 30_000);
+
   it("computes the same region statistics as the PowerShell script", async () => {
     const dir = join(SCREENS, "seal-whisper");
     const file = join(dir, (await readdir(dir)).find((f) => /\.jpe?g$/i.test(f))!);

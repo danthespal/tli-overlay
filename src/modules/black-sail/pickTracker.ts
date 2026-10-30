@@ -5,7 +5,7 @@
 // (N = 1 white, 2 blue, 3 purple, 4 orange), matched against the cards on screen. When two cards
 // share that rarity the pick is ambiguous; the advisor's choice is assumed and flagged.
 
-import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { LogLine } from "../../engine/logLine.js";
 import type { ToolModule } from "../../engine/module.js";
@@ -14,14 +14,19 @@ import type { EffectEntry, Rarity } from "./effects.js";
 import { parseModifier } from "./modifiers.js";
 import type { SealWhisperRead } from "./sealWhisperReader.js";
 import type { ZoneVisit } from "../../engine/session.js";
+import type { LogCycle } from "./cycleScan.js";
+import type { OwnedRead } from "./ownedReader.js";
 
-const PICK = /^UIButton@ normal-click Rarity(\d)SelectedBtn/;
+export const PICK = /^UIButton@ normal-click Rarity(\d)SelectedBtn/;
 const CARD_CLICK = /^UIButton@ normal-click BtnSelect/;
 /** The Void Sea Terminal zone: entering it ends the cycle; what's picked up inside is the chest. */
 export const TERMINAL_ZONE = "XuHaiZhongGang";
 /** How long a Confirm waits for the frame of a card click still being read (two grabs ~1 s apart). */
 const SELECT_WAIT_MS = 4000;
-const RARITY_BY_BUTTON: Record<string, Rarity> = { "1": "white", "2": "blue", "3": "purple", "4": "orange" };
+export const RARITY_BY_BUTTON: Record<string, Rarity> = { "1": "white", "2": "blue", "3": "purple", "4": "orange" };
+
+/** A pick known only from the log (made while the overlay wasn't running): its rarity, no effect. */
+const fromLog = (rarity: Rarity): TrackedCard => ({ id: "log", type: null, rarity, doubled: false, effect: "(picked while the overlay was closed)", group: "unread", unread: true });
 
 /** A card as recorded: what was on screen plus the matched effect. */
 export interface TrackedCard {
@@ -139,6 +144,8 @@ export class PickTracker implements ToolModule {
   /** A Confirm waiting for that frame. */
   private waiting: { snapshot: ConfirmSnapshot; timer: NodeJS.Timeout } | null = null;
   private writes: Promise<void> = Promise.resolve();
+  /** When the state was last saved (epoch ms; 0 = never). */
+  private savedAt = 0;
 
   constructor(private readonly deps: TrackerDeps) {}
 
@@ -151,9 +158,99 @@ export class PickTracker implements ToolModule {
     await mkdir(this.deps.historyDir, { recursive: true });
     try {
       this.state = JSON.parse(await readFile(this.statePath, "utf8")) as State;
+      this.savedAt = (await stat(this.statePath)).mtimeMs;
     } catch {
       /* first run */
     }
+  }
+
+  /**
+   * Squares the cycle with what the game's logs say: picks confirmed while the overlay wasn't
+   * running become unread picks of the logged rarity, and a chest opened since the last save ends
+   * the saved cycle. Saved picks are kept while their rarities agree with the log. True if changed.
+   */
+  reconcile(log: LogCycle): boolean {
+    let { cycle, picks, finished, goal } = this.state;
+    const before = JSON.stringify({ cycle, picks, goal, finished });
+    // Terminal visits after the last save: the first ends the saved cycle (or the one waiting for
+    // its chest), and every visit with picks before it ends one (a visit without is a boss fight).
+    const visits = log.visits.filter((v) => v.at > this.savedAt);
+    if (visits.length) {
+      const ends = visits.filter((v, i) => v.picks > 0 || (i === 0 && (picks.length || finished))).length;
+      // A cycle waiting for its chest already has its number.
+      cycle += ends && finished && !picks.length ? ends - 1 : ends;
+      [picks, finished] = [[], undefined];
+    }
+    const merge = (saved: TrackedCard[], rarities: Rarity[]): TrackedCard[] =>
+      saved.length <= rarities.length && saved.every((p, i) => p.rarity === null || p.rarity === rarities[i])
+        ? [...saved, ...rarities.slice(saved.length).map(fromLog)]
+        : rarities.map(fromLog);
+    if (log.picks.length >= PICKS_PER_CYCLE) {
+      // All 6 picked and the Terminal not entered yet: that cycle waits for its chest.
+      const done = log.picks.slice(0, PICKS_PER_CYCLE);
+      if (finished) finished = { ...finished, picks: merge(finished.picks, done) };
+      else [finished, cycle, picks] = [{ cycle, picks: merge(picks, done), goal }, cycle + 1, []];
+      picks = merge(picks, log.picks.slice(PICKS_PER_CYCLE));
+    } else [picks, finished] = [merge(picks, log.picks), undefined];
+    this.state = { cycle, picks, goal, finished };
+    if (JSON.stringify(this.state) === before) return false;
+    const state = JSON.stringify(this.state, null, 2);
+    this.queue(() => this.writeState(state));
+    return true;
+  }
+
+  /**
+   * Squares this cycle's picks with the "Seal Whispers Owned" panel: unread picks (made while the
+   * overlay wasn't running) get their effect. The panel is grouped by type, not in pick order, so an
+   * unread pick takes a panel Whisper of its own rarity. When the panel disagrees with the picks
+   * (another count, a known pick not on it) the panel wins. A panel with an unmatched Whisper or a
+   * count that doesn't agree is ignored. True if the picks changed.
+   *
+   * After the 6th pick the screen stays open and the panel still lists all 6, while the tracker has
+   * already set that cycle aside for its chest: a full panel squares that cycle, never the new one.
+   */
+  onOwned(read: OwnedRead): boolean {
+    if (!read.whispers.length || read.whispers.some((w) => !w.match) || (read.count !== null && read.count !== read.whispers.length)) return false;
+    const pool: TrackedCard[] = read.whispers.map((w) => {
+      const e = w.match!.entry;
+      return { id: "owned", type: e.group, rarity: w.rarity ?? e.rarity, doubled: w.doubled, effect: w.doubled ? e.doubledText : e.text, group: e.group };
+    });
+    const full = pool.length >= PICKS_PER_CYCLE;
+    const finished = this.state.finished;
+    if (full && (!finished || this.state.picks.length)) return false; // no cycle waiting for its chest: can't place it
+    const saved = full ? finished!.picks : this.state.picks;
+    const before = JSON.stringify(saved);
+    let picks: TrackedCard[] | null = pool.length === saved.length ? [] : null;
+    const left = [...pool];
+    const take = (i: number) => left.splice(i, 1)[0]!;
+    // Known picks first, so an unread one can't take their panel entry.
+    for (const p of picks ? saved : []) {
+      if (p.unread) continue;
+      const i = left.findIndex((c) => c.effect === p.effect && c.rarity === p.rarity);
+      if (i < 0) picks = null;
+      else take(i);
+    }
+    if (picks) {
+      for (const p of saved) {
+        if (!p.unread) picks.push(p);
+        else {
+          const i = left.findIndex((c) => p.rarity === null || c.rarity === p.rarity);
+          picks.push(take(i >= 0 ? i : 0));
+        }
+      }
+    }
+    if (full) finished!.picks = picks ?? pool;
+    else this.state.picks = picks ?? pool;
+    if (JSON.stringify(full ? finished!.picks : this.state.picks) === before) return false;
+    const state = JSON.stringify(this.state, null, 2);
+    this.queue(() => this.writeState(state));
+    if (this.offered.length || this.switchCard) this.advise();
+    return true;
+  }
+
+  /** When the state was last saved (epoch ms; 0 = never): log events after it are news. */
+  get lastSaved(): number {
+    return this.savedAt;
   }
 
   get currentPicks(): TrackedCard[] {
@@ -232,8 +329,9 @@ export class PickTracker implements ToolModule {
       this.deps.onEvent({ kind: "bossRun", record: run });
       return;
     }
-    // Entering the Terminal ends the cycle even if the tracker missed picks (resync).
-    if (this.state.picks.length) this.finishCycle();
+    // Entering the Terminal ends the cycle even if the tracker missed picks (resync). A cycle already
+    // waiting for its chest owns this chest: picks in progress then stay, never put over it.
+    if (this.state.picks.length && !this.state.finished) this.finishCycle();
     const cycle = this.state.finished ?? { cycle: this.state.cycle - 1, picks: [] };
     const record: ChestRecord = {
       time: new Date(visit.start ?? Date.now()).toISOString(),
@@ -306,6 +404,14 @@ export class PickTracker implements ToolModule {
   }
 
   private confirm(rarity: Rarity): void {
+    if (this.waiting) {
+      // A second Confirm while the first still waits for its frame: settle the first now, with
+      // the selection known so far, so the picks stay in order and no timer is left behind.
+      const { snapshot, timer } = this.waiting;
+      clearTimeout(timer);
+      this.waiting = null;
+      this.resolve(snapshot, this.selected);
+    }
     const snapshot: ConfirmSnapshot = {
       rarity,
       offered: this.offered,
@@ -382,6 +488,7 @@ export class PickTracker implements ToolModule {
     const tmp = `${this.statePath}.tmp`;
     await writeFile(tmp, state);
     await rename(tmp, this.statePath);
+    this.savedAt = Date.now();
   }
 
   /** Runs file writes in order; a failed write is logged and doesn't block the later ones. */

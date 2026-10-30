@@ -32,6 +32,8 @@ export interface TailerOptions {
   pollMs?: number;
   /** With fromEnd: gets every line already in the file before tailing starts (e.g. to learn stack sizes). */
   prime?: (line: LogLine) => void;
+  /** With fromEnd: called once priming is done, before the first new line is handled. */
+  primed?: () => Promise<void> | void;
   /** The file appeared, was replaced (the game started a new log) or was cleared: reading restarts at its top. */
   onRotate?: () => void;
   /** A line handler threw: the error, then the next line goes on (default: console.error). */
@@ -79,10 +81,13 @@ export class LogTailer {
         this.offset = s.size;
         // Exactly the bytes before the tail start, so no line is both primed and tailed.
         if (this.options.prime) for await (const line of readLogLines(this.path, s.size)) this.options.prime(line);
+        await this.options.primed?.();
       }
     } catch {
       // Not there yet: poll() picks the file up from its first line once the game creates it.
     }
+    // stop() came while priming: no timer, or it would poll forever (stop() had none to clear).
+    if (this.stopped) return;
     this.timer = setInterval(() => void this.poll(), this.options.pollMs ?? 500);
     await this.poll();
   }

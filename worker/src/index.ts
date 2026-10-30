@@ -34,21 +34,30 @@ async function allow(env: Env, req: Request, records: number, reports: number): 
   const day = new Date(now).toISOString().slice(0, 10);
   const minute = Math.floor(now / 60_000);
   const key = await sha256(`${env.IP_SALT}|${day}|${req.headers.get("CF-Connecting-IP") ?? "?"}`);
-  const row = await env.DB.prepare("SELECT minute, minute_count, records, reports FROM limits WHERE key = ?")
-    .bind(key)
-    .first<{ minute: number; minute_count: number; records: number; reports: number }>();
-  const used = row ?? { minute, minute_count: 0, records: 0, reports: 0 };
-  const perMinute = used.minute === minute ? used.minute_count + 1 : 1;
-  if (perMinute > PER_MINUTE || used.records + records > RECORDS_PER_DAY || used.reports + reports > REPORTS_PER_DAY) return false;
-  // A sender's first upload of the day: yesterday's counters (other keys) are dead, drop them so
-  // the table holds one day, not one row per sender per day forever.
-  if (!row) await env.DB.prepare("DELETE FROM limits WHERE day < ?").bind(day).run();
-  await env.DB.prepare(
-    "INSERT INTO limits (key, day, minute, minute_count, records, reports) VALUES (?, ?, ?, ?, ?, ?) " +
-      "ON CONFLICT (key) DO UPDATE SET minute = excluded.minute, minute_count = excluded.minute_count, records = excluded.records, reports = excluded.reports",
+  // Counted and read back in one statement, so two uploads at the same moment can't both pass on
+  // the same old totals (SQLite reads every SET expression from the row as it was).
+  const used = await env.DB.prepare(
+    "INSERT INTO limits (key, day, minute, minute_count, records, reports) VALUES (?1, ?2, ?3, 1, ?4, ?5) " +
+      "ON CONFLICT (key) DO UPDATE SET minute = excluded.minute, " +
+      "minute_count = CASE WHEN minute = excluded.minute THEN minute_count + 1 ELSE 1 END, " +
+      "records = records + excluded.records, reports = reports + excluded.reports " +
+      "RETURNING minute_count, records, reports",
   )
-    .bind(key, day, minute, perMinute, used.records + records, used.reports + reports)
-    .run();
+    .bind(key, day, minute, records, reports)
+    .first<{ minute_count: number; records: number; reports: number }>();
+  if (!used) return false;
+  if (used.minute_count > PER_MINUTE || used.records > RECORDS_PER_DAY || used.reports > REPORTS_PER_DAY) {
+    // Refused: what it added is taken back, so it doesn't count against the sender.
+    await env.DB.prepare("UPDATE limits SET minute_count = MAX(0, minute_count - 1), records = records - ?, reports = reports - ? WHERE key = ?")
+      .bind(records, reports, key)
+      .run();
+    return false;
+  }
+  // A sender's first upload of the day (a fresh row): yesterday's counters (other keys) are dead,
+  // drop them so the table holds one day, not one row per sender per day forever.
+  if (used.minute_count === 1 && used.records === records && used.reports === reports) {
+    await env.DB.prepare("DELETE FROM limits WHERE day < ?").bind(day).run();
+  }
   return true;
 }
 
@@ -107,7 +116,11 @@ async function postReport(req: Request, env: Env): Promise<Response> {
   let image: Uint8Array | null = null;
   if (typeof input.image === "string") {
     if (input.image.length > (MAX_IMAGE * 4) / 3 + 4) return json({ error: "image too large" }, 400);
-    image = base64ToBytes(input.image);
+    try {
+      image = base64ToBytes(input.image);
+    } catch {
+      return json({ error: "image is not base64" }, 400); // atob's error would otherwise be a 500
+    }
   }
   const type = image ? imageType(image) : null;
   if (image && !type) return json({ error: "image must be a JPEG or PNG under 200 KB" }, 400);
@@ -133,7 +146,8 @@ async function forget(req: Request, env: Env): Promise<Response> {
 
 async function exportRecords(url: URL, env: Env): Promise<Response> {
   const after = Number(url.searchParams.get("after") ?? 0) || 0;
-  const limit = Math.min(EXPORT_PAGE, Number(url.searchParams.get("limit") ?? EXPORT_PAGE) || EXPORT_PAGE);
+  // At least 1: SQLite reads a negative LIMIT as no limit at all.
+  const limit = Math.max(1, Math.min(EXPORT_PAGE, Number(url.searchParams.get("limit") ?? EXPORT_PAGE) || EXPORT_PAGE));
   const { results } = await env.DB.prepare("SELECT id, uid, install, app, time, kind, data, received FROM records WHERE id > ? ORDER BY id LIMIT ?")
     .bind(after, limit)
     .all<{ id: number; data: string }>();

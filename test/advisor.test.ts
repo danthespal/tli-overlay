@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseLogLine } from "../src/engine/logLine.js";
 import { configForGoal, DEFAULT_GOAL, evaluate, loadAdvisorConfig, recommend, setScore, tierOf, type AdvisorConfig } from "../src/modules/black-sail/advisor.js";
 import { flameTier } from "../src/modules/black-sail/flameReader.js";
@@ -166,6 +166,42 @@ describe("PickTracker", () => {
     expect(events.some((e) => e.kind === "picked")).toBe(false);
     tracker.onSelected("middle");
     expect(events.find((e) => e.kind === "picked")).toMatchObject({ record: { method: "frame", picked: { id: "middle" } } });
+  });
+
+  it("settles a Confirm still waiting for its frame when a second Confirm comes, keeping the picks in order", async () => {
+    vi.useFakeTimers();
+    try {
+      const click = parseLogLine("[2026.10.25-03.39.11:787][877]TLGame: Display: [Game] UIButton@ normal-click BtnSelect", 1);
+      tracker.onCards(three(card("left", SCRAP_QTY, "white"), card("middle", SCRAP_FLAT, "blue"), card("right", INVITE, "orange")));
+      tracker.onLine(click);
+      tracker.onLine(pickLine(1)); // waits for the click's frame
+      tracker.onLine(pickLine(4)); // a second Confirm before that frame: the first is settled now
+      expect(events.filter((e) => e.kind === "picked")).toMatchObject([{ record: { pick: 1, picked: { id: "left" } } }]);
+      tracker.onSelected("right"); // the frame: settles the second
+      await vi.advanceTimersByTimeAsync(5000); // no timer of the first is left to record it again
+      expect(events.filter((e) => e.kind === "picked")).toMatchObject([
+        { record: { pick: 1, picked: { id: "left" } } },
+        { record: { pick: 2, picked: { id: "right" } } },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives the chest to the cycle waiting for it, and keeps the picks already made after it", async () => {
+    const taken = (effect: string, rarity: EffectEntry["rarity"]) => ({ id: "left", type: null, rarity, doubled: false, effect, group: "Wealth" });
+    const finished = { cycle: 2, picks: Array.from({ length: 6 }, () => taken(SCRAP_QTY, "white")) };
+    await writeFile(join(dir, "black-sail-state.json"), JSON.stringify({ cycle: 3, picks: [taken(INVITE, "orange")], finished }));
+    const t = new PickTracker({ table, config: cfg, historyDir: dir, onEvent: (e) => events.push(e) });
+    await t.load();
+    t.onZoneEnd({
+      index: 0, name: "XuHaiZhongGang", path: "/Game/Art/Maps/S2/XuHaiZhongGang/XuHaiZhongGang", start: 0, end: 30_000,
+      startLine: 1, modifiers: [], loot: new Map([[5140, 120]]), uncertainPickups: 0, monstersCreated: 0,
+    });
+    await t.flush();
+    expect(events.find((e) => e.kind === "chest")).toMatchObject({ record: { cycle: 2, complete: true, loot: { "5140": 120 } } });
+    expect(events.some((e) => e.kind === "cycleDone")).toBe(false);
+    expect(t.summary()).toEqual({ cycle: 3, picks: [taken(INVITE, "orange")] });
   });
 
   it("ignores a card-click result that arrives after the screen closed without a Confirm", () => {

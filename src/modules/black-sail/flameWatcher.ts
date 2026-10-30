@@ -4,6 +4,8 @@
 //   PointerImgBtn            -> a flame was clicked: grab, read the newly selected flame's text
 //   BtnConfirm               -> the selected flame was put in: report it (no grab)
 //   VoidBeacon ... Destory   -> screen closed: cancel anything pending, forget this screen
+//   selectAltarId:N          -> ~10-15 s later, after the pirates: the id the game sends for this
+//                               round (reported, to learn which flame each id stands for)
 //
 // Across clicks it keeps what it has learned about each slot, so after clicking through the
 // flames every offer is known exactly (the two "S" flames included).
@@ -19,6 +21,7 @@ const OPENED = /^TipMsgShowMgr@DispatchPageRunChange PageName = VoidBeacon , Pag
 const CLOSED = /^TipMsgShowMgr@DispatchPageRunChange PageName = VoidBeacon , PageRunState = Destory/;
 const CLICK = /^UIButton@ normal-click PointerImgBtn/;
 const CONFIRM = /^UIButton@ normal-click BtnConfirm/;
+const ALTAR = /^UMapGamePlayAction_SeasonAltar msgToServer pendingRouteIds num:\d+, selectAltarId:(\d+)/;
 
 export type FlameTrigger = "open" | "click";
 
@@ -45,7 +48,9 @@ export type FlameEvent =
    */
   | { kind: "chosen"; effect: FlameEffect | null; numbers: number[]; selectedText: string; certain: boolean }
   | { kind: "skipped"; trigger: FlameTrigger; reason: string }
-  | { kind: "closed" };
+  | { kind: "closed" }
+  /** The game's id for the round, logged after the screen closed (meaning not known yet). */
+  | { kind: "altar"; id: number };
 
 export interface FlameWatcherDeps {
   grab: (trigger: FlameTrigger) => Promise<GrabResult>;
@@ -88,6 +93,9 @@ export class FlameWatcher implements ToolModule {
   onLine(line: LogLine): void {
     const t = line.text;
     if (OPENED.test(t)) {
+      // The last Confirm still waits for its frame: report it now (uncertain), from what was read
+      // before, so the old screen's choice can't take this screen's read or close it.
+      if (this.choosing) this.reportChosen(false);
       this.open = true;
       this.offers = [];
       this.bestIcon.clear();
@@ -106,6 +114,9 @@ export class FlameWatcher implements ToolModule {
     } else if (CLOSED.test(t)) {
       if (this.choosing) this.closePending = true; // keep the pending read alive
       else this.close();
+    } else {
+      const altar = ALTAR.exec(t);
+      if (altar) this.deps.onEvent({ kind: "altar", id: +altar[1]! });
     }
   }
 

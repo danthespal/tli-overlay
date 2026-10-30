@@ -78,6 +78,34 @@ describe("Sharer", () => {
     expect(await readFile(join(dir, "shared.jsonl"), "utf8").catch(() => "")).toBe("");
   });
 
+  it("waits out the retry delay when offline, even once a full batch is queued", async () => {
+    const s = sharer({ share: true });
+    answer = "offline";
+    s.add("chest", { cycle: 0 });
+    await s.flush();
+    expect(calls).toHaveLength(1);
+    for (let i = 1; i <= 60; i++) s.add("picked", { pick: i });
+    await new Promise((r) => setTimeout(r, 20)); // an immediate upload would have run by now
+    expect(calls).toHaveLength(1);
+    expect(s.pending).toBe(61);
+    await s.setShare(false); // clears the retry timer
+  });
+
+  it("drops what is still queued when the player deletes their shared data", async () => {
+    const s = sharer({ share: true });
+    answer = "offline";
+    s.add("chest", { cycle: 1 });
+    await s.flush(); // not sent: queued
+    answer = 200;
+    expect(await s.forget()).toBe("Deleted 7 shared records and reports");
+    expect(s.pending).toBe(0);
+    await s.flush();
+    expect(calls.map((c) => c.url)).toEqual(["http://collector/v1/records", "http://collector/v1/forget"]);
+    await new Promise((r) => setTimeout(r, 50)); // queue file rewritten
+    expect(await readFile(join(dir, "share-queue.jsonl"), "utf8")).toBe("");
+    await s.setShare(false); // clears the retry timer
+  });
+
   it("saves the install id as soon as it is made", async () => {
     const saved: Settings[] = [];
     const settings: Settings = { share: true };
