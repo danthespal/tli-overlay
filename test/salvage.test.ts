@@ -90,6 +90,17 @@ describe("SalvageTracker and backfill", () => {
     expect(await backfillSalvage([{ path: log }], history)).toEqual({ found: 1, added: 0, memories: 0 });
   });
 
+  it("still skips the batches it has when the history has a line cut off by a crash before them", async () => {
+    const log = join(dir, "UE_game.log");
+    await writeFile(log, SALVAGE_LINES.join("\n") + "\n");
+    const history = join(dir, "history");
+    await backfillSalvage([{ path: log }], history);
+    const file = join(history, "black-sail-salvage.jsonl");
+    // A record cut off mid-append, with the later records written after it.
+    await writeFile(file, '{"time":"2026-10-2\n' + (await readFile(file, "utf8")));
+    expect(await backfillSalvage([{ path: log }], history)).toEqual({ found: 1, added: 0, memories: 0 });
+  });
+
   it("scans the log folder once per backup log and only the new part of the live log", async () => {
     const logs = join(dir, "Logs");
     const history = join(dir, "history");

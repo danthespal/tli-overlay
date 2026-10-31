@@ -107,10 +107,15 @@ export async function backfillSalvage(logs: { path: string; bytes?: number }[], 
   await mkdir(historyDir, { recursive: true });
   const file = join(historyDir, SALVAGE_FILE);
   const existing = new Set<string>();
-  try {
-    for (const line of (await readFile(file, "utf8")).split("\n")) if (line) existing.add((JSON.parse(line) as SalvageRecord).time);
-  } catch {
-    /* no file yet */
+  // Line by line: a line cut off by a crash mid-append is skipped, not taken for "no history" (which
+  // would add every salvage of the logs again, twice in the calibration).
+  for (const line of (await readFile(file, "utf8").catch(() => "")).split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      existing.add((JSON.parse(line) as SalvageRecord).time);
+    } catch {
+      /* cut-off line */
+    }
   }
   const result: BackfillResult = { found: 0, added: 0, memories: 0 };
   for (const log of logs) {

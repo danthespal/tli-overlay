@@ -334,3 +334,20 @@ describe("tiers, combo and set score (tartarus-style)", () => {
     expect(flameTier("hero_memories", "heroMemories")).toBe("S");
   });
 });
+
+describe("loadAdvisorConfig", () => {
+  it("starts from the shipped config when the calibrated copy is unreadable (edited by hand)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tli-advisor-"));
+    try {
+      const bad = join(dir, "advisor-config.json");
+      await writeFile(bad, '{ "weights": { "scraps": 0.07, }'); // a stray comma, no closing brace
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const loaded = await loadAdvisorConfig(bad);
+      expect(loaded.goals).toEqual(cfg.goals);
+      expect(warn).toHaveBeenCalledOnce();
+      warn.mockRestore();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

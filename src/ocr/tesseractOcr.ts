@@ -16,9 +16,10 @@ import { readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
-import { createScheduler, createWorker, PSM, type Scheduler } from "tesseract.js";
+import { createScheduler, createWorker, PSM, type Scheduler, type Worker } from "tesseract.js";
 import { OWNED_COUNT, OWNED_TEXT } from "../modules/black-sail/ownedReader.js";
 import { CHECK_REGIONS, pillSlot } from "../modules/black-sail/pill.js";
+import { cardInSlot, NAME_CROP, PRICE_CROP, priceDigits, SHOP_SLOTS, type ShopSlot } from "../modules/blessings-from-gods/shopReader.js";
 import { APP_DIR } from "../paths.js";
 import type { OcrLine, OcrPage, OcrRegion, Region } from "./windowsOcr.js";
 
@@ -31,8 +32,8 @@ export interface Pixels {
   data: Uint8Array | Uint8ClampedArray;
 }
 
-/** Which Black Sail screen the frame shows, so only its text is read. */
-export type ScreenKind = "cards" | "select" | "flames" | "owned";
+/** Which screen the frame shows (Black Sail, or the Blessings from Gods shop), so only its text is read. */
+export type ScreenKind = "cards" | "select" | "flames" | "owned" | "shop";
 
 /** Card text columns (1920x1080): centres of the three cards; the Switch view's one card is in the middle. */
 const CARD_CX = [518, 960, 1415];
@@ -47,6 +48,15 @@ const PIECE_GAP = 60;
 /** Upscale for Tesseract (its models like ~30 px x-height; the game's text is ~20 px). */
 const SCALE = 2;
 const BINARIZE_AT = 90;
+/** Shop card names are white over bright art: only near-white pixels are text. */
+const SHOP_TEXT_AT = 200;
+/** Shop prices are small: the digits engine reads them at 3x. */
+const DIGITS_SCALE = 3;
+/**
+ * Shop prices binarised: read raw, a 2-digit "13" was lost on about half the frames (the card's glow
+ * changes between frames); binarised at 120-160 every price of 6 frames read (2026-10-31).
+ */
+const SHOP_PRICE_AT = 140;
 
 export async function decodeImage(path: string): Promise<Pixels> {
   const buf = await readFile(path);
@@ -209,6 +219,7 @@ const IDLE_MS = 300_000;
 
 export class TesseractOcr {
   private scheduler: Promise<Scheduler> | undefined;
+  private digits: Promise<Worker> | undefined;
   /** Reads in progress: the engines are never stopped under one. */
   private active = 0;
   private idleTimer: NodeJS.Timeout | undefined;
@@ -264,23 +275,48 @@ export class TesseractOcr {
     return started;
   }
 
-  /** OCR of one crop (1920x1080 coordinates); pieces come back in frame coordinates. */
-  private async crop(px: Pixels, region: Region, psm: PSM, threshold = 0): Promise<OcrLine[]> {
-    const scheduler = await this.get();
+  /**
+   * One more engine for numbers alone (shop prices): single line, digits only. The general engines
+   * read a lone "5" as "Jy" or "Bo"; this one reads all of them (2026-10-31 sample, 3x upscale).
+   */
+  private getDigits(): Promise<Worker> {
+    this.digits ??= (async () => {
+      const langPath = this.opts.langPath ?? TESSDATA;
+      const w = await createWorker(this.opts.lang ?? "eng", 1, { langPath, cachePath: langPath, cacheMethod: "readOnly", gzip: true, logger: () => undefined });
+      try {
+        await w.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE, tessedit_char_whitelist: "0123456789" });
+      } catch (err) {
+        await w.terminate().catch(() => undefined);
+        throw err;
+      }
+      return w;
+    })();
+    const started = this.digits;
+    started.catch(() => {
+      if (this.digits === started) this.digits = undefined;
+    });
+    return started;
+  }
+
+  /** OCR of one crop (1920x1080 coordinates); pieces come back in frame coordinates. `digits`: numbers only. */
+  private async crop(px: Pixels, region: Region, psm: PSM, threshold = 0, digits = false, upscale?: number): Promise<OcrLine[]> {
     const sx = px.width / 1920;
     const sy = px.height / 1080;
     const [x, y, w, h] = region;
     const box = clampBox(px, x * sx, y * sy, w * sx, h * sy);
     if (box.x1 <= box.x0 || box.y1 <= box.y0) return [];
-    const { data } = (await scheduler.addJob("recognize", cropBmp(px, box, SCALE, threshold), {}, { blocks: true, text: false })) as Awaited<
-      ReturnType<Awaited<ReturnType<typeof createWorker>>["recognize"]>
-    >;
+    const scale = upscale ?? (digits ? DIGITS_SCALE : SCALE);
+    const bmp = cropBmp(px, box, scale, threshold);
+    type Result = Awaited<ReturnType<Worker["recognize"]>>;
+    const { data } = digits
+      ? await (await this.getDigits()).recognize(bmp, {}, { blocks: true, text: false })
+      : ((await (await this.get()).addJob("recognize", bmp, {}, { blocks: true, text: false })) as Result);
     const lines = (data.blocks ?? []).flatMap((b) =>
       b.paragraphs.flatMap((p) =>
         p.lines.map((l) => ({
           words: (l.words as TessWord[]).map((wd) => ({
             text: wd.text,
-            bbox: { x0: wd.bbox.x0 / SCALE + box.x0, y0: wd.bbox.y0 / SCALE + box.y0, x1: wd.bbox.x1 / SCALE + box.x0, y1: wd.bbox.y1 / SCALE + box.y0 },
+            bbox: { x0: wd.bbox.x0 / scale + box.x0, y0: wd.bbox.y0 / scale + box.y0, x1: wd.bbox.x1 / scale + box.x0, y1: wd.bbox.y1 / scale + box.y0 },
           })),
         })),
       ),
@@ -304,6 +340,29 @@ export class TesseractOcr {
     return letters(bin, effectY) > letters(raw, effectY) ? [...titles, ...bin.filter((l) => l.y >= effectY)] : raw;
   }
 
+  /**
+   * A shop card's price, read binarised and raw, each checked against the digit count from the
+   * pixels (priceDigits). Each way misreads what the other gets right: binarised read 79 as "19"
+   * on every frame, raw read 11 as "1" and lost a 13 (2026-10-31). A read with the wrong count is
+   * dropped (the fallbacks are tried when both are); when right-count reads still differ, the
+   * higher price is kept: at worst a good offer is skipped, never a bad one bought. With no read
+   * agreeing nothing is returned ("price not read", no verdict) rather than a wrong price.
+   */
+  private async price(px: Pixels, s: ShopSlot): Promise<OcrLine[]> {
+    const region = PRICE_CROP(s);
+    const expected = priceDigits(px, s);
+    const digits = (lines: OcrLine[]) => lines.map((l) => l.text).join("").replace(/[^0-9]/g, "");
+    const fits = (lines: OcrLine[]) => digits(lines).length > 0 && (expected === null || digits(lines).length === expected);
+    const read = (threshold: number, scale: number) => this.crop(px, region, PSM.SINGLE_LINE, threshold, true, scale);
+    const both = (await Promise.all([read(SHOP_PRICE_AT, DIGITS_SCALE), read(0, DIGITS_SCALE)])).filter(fits);
+    if (both.length) return both.reduce((a, b) => (+digits(b) > +digits(a) ? b : a));
+    for (const [threshold, scale] of [[SHOP_PRICE_AT, 2], [100, DIGITS_SCALE]] as const) {
+      const lines = await read(threshold, scale);
+      if (fits(lines)) return lines;
+    }
+    return [];
+  }
+
   /** Reads one decoded frame for a screen kind: text pieces plus the requested region statistics. */
   async readPixels(px: Pixels, file: string, regions: Region[] = [], kind: ScreenKind = "cards"): Promise<OcrPage> {
     this.active++;
@@ -318,6 +377,11 @@ export class TesseractOcr {
   private async read(px: Pixels, file: string, regions: Region[], kind: ScreenKind): Promise<OcrPage> {
     let lines: OcrLine[];
     if (kind === "flames") lines = await this.crop(px, FLAME_CROP, PSM.SINGLE_BLOCK);
+    else if (kind === "shop") {
+      // Name and price of each card on screen; empty grid slots are skipped by a pixel test.
+      const slots = SHOP_SLOTS.filter((s) => cardInSlot(px, s));
+      lines = (await Promise.all(slots.flatMap((s) => [this.crop(px, NAME_CROP(s), PSM.SINGLE_BLOCK, SHOP_TEXT_AT), this.price(px, s)]))).flat();
+    }
     else if (kind === "owned") lines = (await Promise.all([this.crop(px, OWNED_TEXT, PSM.SINGLE_BLOCK), this.crop(px, OWNED_COUNT, PSM.SINGLE_LINE)])).flat();
     else if (kind === "select") {
       // One raw card crop (the middle card is there in both views) so the watcher can tell the
@@ -342,8 +406,11 @@ export class TesseractOcr {
   async stop(): Promise<void> {
     clearTimeout(this.idleTimer);
     const s = this.scheduler;
+    const d = this.digits;
     this.scheduler = undefined;
+    this.digits = undefined;
     // A start that failed has nothing to terminate.
     if (s) await s.then((x) => x.terminate(), () => undefined);
+    if (d) await d.then((x) => x.terminate(), () => undefined);
   }
 }

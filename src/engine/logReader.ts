@@ -79,8 +79,14 @@ export class LogTailer {
       this.fileId = s.birthtimeMs;
       if (this.options.fromEnd ?? true) {
         this.offset = s.size;
-        // Exactly the bytes before the tail start, so no line is both primed and tailed.
-        if (this.options.prime) for await (const line of readLogLines(this.path, s.size)) this.options.prime(line);
+        // Exactly the bytes before the tail start, so no line is both primed and tailed. The tailed
+        // lines are numbered on from the primed ones (line numbers keep the file's order).
+        if (this.options.prime) {
+          for await (const line of readLogLines(this.path, s.size)) {
+            this.lineNo = line.lineNo;
+            this.options.prime(line);
+          }
+        }
         await this.options.primed?.();
       }
     } catch {

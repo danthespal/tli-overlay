@@ -223,7 +223,8 @@ export class CaptureWorker {
   }
 }
 
-const SCREEN_OPENED = /^TipMsgShowMgr@DispatchPageRunChange PageName = (VoidBeacon|VoidPort) , PageRunState = Run/;
+// A Refresh click in the Blessings from Gods shop warms them too: its new cards are read ~1 s later.
+const SCREEN_OPENED = /^TipMsgShowMgr@DispatchPageRunChange PageName = (VoidBeacon|VoidPort|GroceryStoreV3) , PageRunState = Run|requested row 'RefreshBtn_Btn'/;
 
 /** Engine module: starts the worker (and the window share) the moment a choice screen opens. */
 export function warmOnScreens(...targets: { warm(): void }[]): ToolModule {

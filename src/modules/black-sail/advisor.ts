@@ -4,7 +4,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { APP_DIR, PACKAGED, USER_DIR } from "../../paths.js";
+import { APP_DIR, USER_DIR } from "../../paths.js";
 import type { EffectEntry, Rarity } from "./effects.js";
 import { MATERIALS, parseModifier, type Material, type Modifier } from "./modifiers.js";
 
@@ -95,7 +95,16 @@ export async function loadAdvisorConfig(path = ADVISOR_CONFIG): Promise<AdvisorC
     if (err.code === "ENOENT" && path !== DEFAULT_ADVISOR_CONFIG) return readFile(DEFAULT_ADVISOR_CONFIG, "utf8");
     throw err;
   });
-  const cfg = JSON.parse(text) as AdvisorConfig;
+  let cfg: AdvisorConfig;
+  try {
+    cfg = JSON.parse(text) as AdvisorConfig;
+  } catch (err) {
+    // A calibrated copy that isn't JSON (edited by hand) must not stop the overlay from starting:
+    // the shipped config is used, and the next calibration writes a good copy over the bad one.
+    if (path === DEFAULT_ADVISOR_CONFIG) throw err;
+    console.warn(`advisor config ${path} is unreadable (${err instanceof Error ? err.message : err}): using the shipped one`);
+    cfg = JSON.parse(await readFile(DEFAULT_ADVISOR_CONFIG, "utf8")) as AdvisorConfig;
+  }
   // The goals are the product's, not calibrated: a calibrated copy next to the exe keeps the
   // list it was made with, so it always comes from the shipped config (e.g. Best FE removed).
   if (path !== DEFAULT_ADVISOR_CONFIG) {

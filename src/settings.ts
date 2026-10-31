@@ -2,6 +2,7 @@
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import type { BlessingCustom } from "./modules/blessings-from-gods/shopPrices.js";
 import { USER_DIR } from "./paths.js";
 
 export interface Settings {
@@ -11,6 +12,11 @@ export interface Settings {
   install?: string;
   /** Share anonymous data: null = not asked yet. */
   share?: boolean | null;
+  /**
+   * Blessings from Gods: where the player's Divinity Stones come from, the profit margin (%), and
+   * the typed prices and learned item ids (see modules/blessings-from-gods/shopPrices.ts).
+   */
+  blessing?: { source: "bought" | "farmed"; margin: number } & BlessingCustom;
 }
 
 export const SETTINGS_FILE = join(USER_DIR, "settings.json");

@@ -20,6 +20,8 @@ npm run audit -- "path/to/UE_game.log"
 npm run read-cards                # read Seal Whisper cards from the saved sample screenshots
 npm run read-cards -- shot.jpg    # ...or from any screenshot
 npm run read-flames               # read the anchor (flame) screen from the saved samples
+npm run read-shop                 # read the Blessings from Gods shop samples and value each offer (data/prices.json)
+npm run read-shop -- shot.jpg --log path/to/UE_game.log --farmed --margin 10   # ...any screenshot, prices from that log
 npm run build-flame-icons         # rebuild flame icon references from samples/screens/anchor/labels.json
 npm run overlay                   # transparent click-through overlay over the game (advice badges, flame labels, cycle)
 npm run overlay -- --demo shot.jpg out.png   # draw the overlay over a saved screenshot (no game needed)
@@ -88,10 +90,12 @@ src/
     events.ts      typed events: mapEnter, mapModifier, itemChange, bag*, monsterCreated
     session.ts     zone visits + loot deltas per zone, item batches with stack deltas
     module.ts      ToolModule interface every mechanic implements
+    prices.ts      Trade House price checks (XchgSearchPrice) -> data/prices.json, the price most listings ask per item
     engine.ts      lines -> events -> session -> modules (a module that throws doesn't stop the others)
   capture/
     gameCapture.ts window share of the game (Electron desktopCapturer) with a hidden capture page
     worker.ts      client of scripts/worker.ps1: OCR, window rects and the screen-copy fallback
+    foreground.ts  client of scripts/foreground.ps1: which app is in front and whether it covers the game (the overlay hides then; not for one on another monitor)
     windowCapture.ts one-shot grab (CLI tools)
     dataset.ts     what was read, per day (pruned after 14 days in the app)
   ocr/
@@ -109,6 +113,12 @@ src/
       autoCalibrate.ts       the player's copy: the shipped fit blended with their own history (each value weighted by how much data each side has), refit after every chest / salvage
       salvageTracker.ts      records Hero Memory salvages (ExchangeItem batches) and scans old logs for them
       pickTracker.ts         cycle picks, history file (data/history/)
+    blessings-from-gods/
+      index.ts               shop open/closed (log page GroceryStoreV3), price checks into the price book
+      items.ts               shop pool with item ids and offer sizes
+      calc.ts                offer value after tax, max stones for a margin, buy / skip
+      shopReader.ts          reads the shop grid (7 per row) from a screenshot: name, quantity, stone price
+      shopWatcher.ts         grabs and reads the shop on open, after clicks in it, and when a page over it closes
   overlay/         Electron main process, the overlay page, the report window
   share/           anonymous sharing: record format, queue, collector address
   cli/             audit, read-cards, read-flames, calibrate, watch, pull, reports
@@ -116,6 +126,7 @@ test/              vitest
 worker/            the collector (Cloudflare Worker + D1)
 scripts/tli-lib.ps1  the grab and OCR code (C# pixel helpers, Windows.Media.Ocr), shared by:
 scripts/worker.ps1   the warm helper (JSON lines over stdin/stdout)
+scripts/foreground.ps1 WinEvent hooks: the app in front and whether it overlaps the game, on each change (nothing polled)
 scripts/capture/     capture-window.ps1, one grab per process
 scripts/ocr/         windows-ocr.ps1, one OCR run per process; plus the scripts that turned the
                      Seal Whisper handbook screenshots into a table
@@ -129,4 +140,4 @@ Patterns that only one mechanic cares about live in that module's `onLine`. Patt
 ## Not built yet
 
 - Item names (only `ConfigBaseId`s are known; FE = 100300)
-- Prices
+- Prices for Black Sail (the price book in `engine/prices.ts` has them; the advisor doesn't use it yet)

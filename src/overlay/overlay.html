@@ -48,6 +48,48 @@
   .flame.bestflame { border-color: rgba(61, 220, 132, 0.7); box-shadow: 0 0 0 1px rgba(61, 220, 132, 0.4), 0 8px 28px rgba(0, 0, 0, 0.55); }
   .flame.bestflame .rank { background: var(--good); color: #052b16; }
 
+  /* Blessings from Gods: one verdict per shop card, over the top of its art (cards are 153 px wide) */
+  .offer { width: 146px; box-sizing: border-box; padding: 5px 7px; font-size: 13px; border-radius: 9px; text-align: center; }
+  .offer .rank { margin: 0; }
+  .offer .detail { font-size: 11.5px; margin-top: 2px; }
+  .offer.buy { border-color: rgba(61, 220, 132, 0.7); box-shadow: 0 0 0 1px rgba(61, 220, 132, 0.4), 0 8px 28px rgba(0, 0, 0, 0.55); }
+  .offer.unknown { opacity: 0.85; }
+  /* Worth buying, but the bag hasn't the stones. */
+  .offer.short { border-color: rgba(245, 166, 35, 0.6); box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.3), 0 8px 28px rgba(0, 0, 0, 0.55); }
+  .rank.short { background: var(--warn); color: #2b1a02; }
+  /* Top middle of the shop, between its title and the stone count: the advice is read, not known. */
+  .disclaimer { left: 960px; top: 12px; transform: translateX(-50%); padding: 6px 14px; font-size: 13px; white-space: nowrap;
+    color: var(--warn); border-color: rgba(245, 166, 35, 0.45); }
+  /* The price table: left of the shop's cards; in the Trade House over its category list, which a
+     search by name doesn't need (the search results' price pop-up opens right of the search bar). */
+  /* Shop: below the item pop-up a card click opens on the left (x 117-393, y 240-580). */
+  .dock.shop { left: 56px; top: 596px; width: 384px; }
+  .brand.drag { cursor: move; user-select: none; }
+  .dock.tradehouse { left: 14px; top: 176px; width: 384px; }
+  .dock.tradehouse .box { background: rgb(14, 12, 26); } /* the category names would show through */
+  .fold { cursor: pointer; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); font-weight: 700; }
+  .fold:hover { color: var(--text); border-color: #9aa0b4; }
+  .ptable { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+  .ptable th { font-weight: 600; color: var(--faint); text-align: left; padding: 0 4px 3px; font-size: 11.5px; }
+  .ptable td { padding: 2px 4px; border-top: 1px solid var(--border); vertical-align: middle; }
+  .ptable img, .ptable .noicon { width: 22px; height: 22px; display: block; border-radius: 4px; }
+  .ptable .noicon { background: var(--surface-2); border: 1px solid var(--border); box-sizing: border-box; }
+  .ptable .name { cursor: pointer; }
+  .ptable .name:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+  .ptable input { width: 74px; box-sizing: border-box; padding: 2px 5px; font: inherit; color: var(--text);
+    background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: 5px; text-align: right; }
+  .ptable input:focus { outline: none; border-color: var(--gold); }
+  .ptable .st { white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+  .st .ok { color: var(--good); } .st .old { color: var(--warn); } .st .todo { color: var(--bad); }
+  .opts { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .opts .goals { margin: 0; }
+  .opts + .opts { margin-top: 6px; }
+  .opt-label { width: 96px; flex: none; }
+  .opts input { width: 44px; box-sizing: border-box; padding: 2px 5px; font: inherit; color: var(--text);
+    background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: 5px; text-align: right; }
+  .opts input:focus { outline: none; border-color: var(--gold); }
+
   /* Rarity */
   .white { --c: var(--white); } .blue { --c: var(--blue); } .purple { --c: var(--purple); } .orange { --c: var(--orange); }
   .card.white, .card.blue, .card.purple, .card.orange { border-left-color: var(--c); }
@@ -111,7 +153,9 @@
   const CARD_X = { left: 518, middle: 960, right: 1415 };
   const stage = document.getElementById("stage");
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const tier = (t) => (t ? `<span class="tier ${t}" title="Tier: how strong on its own">${t}</span>` : "");
+  /** FE prices: 4 significant digits below 1 FE (0.0201), 2 decimals above (21, 6.25). */
+  const priceText = (v) => (v >= 1 ? String(+v.toFixed(2)) : String(+v.toPrecision(3)));
+  const tier = (t) =>(t ? `<span class="tier ${t}" title="Tier: how strong on its own">${t}</span>` : "");
   const SAIL = `<svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15.5" fill="#181430"/><path d="M10 6 L10 25 L23 24 Z" fill="#f0b030"/><rect x="8.5" y="5" width="1.6" height="21" fill="#c8d2dc"/></svg>`;
   /**
    * final ×N: the expected final chest vs a chest with no Whispers (what ★ BEST is based on, so the
@@ -183,6 +227,28 @@
         <div class="head">${tier(s.switchCard.tier)}<span class="rank ${d !== null && d <= 0 && !s.switchCard.tie ? "no" : ""}">${verdict}</span><span class="label">${esc(s.switchCard.label)}</span></div>
         <div class="detail">${detail}</div>${scores(s.switchCard)}</div>`);
     }
+    if (s.screen === "shop" && s.shop) {
+      html.push(`<div class="box disclaimer">⚠ The overlay reads the cards from the screen and can make mistakes: check the item, amount and price before you buy.</div>`);
+      for (const o of s.shop.offers) {
+        // Refresh clicked: these verdicts are for the old cards; a neutral badge until the new read.
+        if (s.shop.reading) {
+          html.push(`<div class="box offer unknown" style="left:${o.x - 73}px; top:${o.y + 6}px"><span class="rank">…</span><div class="detail">Reading…</div></div>`);
+          continue;
+        }
+        const fe = (n) => `${n >= 0 ? "+" : "−"}${Math.abs(n) < 10 ? Math.abs(n).toFixed(2) : Math.round(Math.abs(n))} FE`;
+        // A box of random stones: its range, valued at the average.
+        const dice = o.gamble ? `🎲 ${esc(o.gamble)} · ` : "";
+        const body = o.verdict === "buy" && o.short
+          ? `<span class="rank short">✓ BUY</span><div class="detail">need ${o.short} more stone${o.short > 1 ? "s" : ""}</div>`
+          : o.verdict === "buy"
+          ? `<span class="rank go">✓ BUY</span><div class="detail">${dice}${o.gamble ? `max ${o.maxStones}` : `${fe(o.profit)} · pay up to ${o.maxStones}`}</div>`
+          : o.verdict === "skip"
+            ? `<span class="rank no">✗ SKIP</span><div class="detail">${dice}${o.gamble ? `max ${o.maxStones}` : o.maxStones > 0 ? `pay up to ${o.maxStones}` : "worth under 1 stone"}</div>`
+            : `<span class="rank">?</span><div class="detail">${esc(o.why ?? "")}</div>`;
+        const tip = o.gamble ? `${o.label}: gives ${o.gamble} Divinity Stones at random, valued at the average` : o.label;
+        html.push(`<div class="box offer ${o.short ? "short" : o.verdict}" style="left:${o.x - 73}px; top:${o.y + 6}px" title="${esc(tip)}">${body}</div>`);
+      }
+    }
     if (s.screen === "flames") {
       for (const f of s.flames) {
         const pos = f.side === "left" ? `right:${1920 - (f.x - 48)}px` : `left:${f.x + 48}px`;
@@ -192,7 +258,10 @@
 
     // The dock, top right: status card, first-start question, Black Sail panel.
     const dock = [];
-    if (s.health.show) dock.push(statusCard(s.health, s.version));
+    // The status card is always top right: with the price table (moved left, or wherever the player
+    // dragged it) it gets a box of its own there.
+    if (s.health.show && s.prices) html.push(`<div class="dock">${statusCard(s.health, s.version)}</div>`);
+    else if (s.health.show) dock.push(statusCard(s.health, s.version));
     if (s.share.ask) {
       // Asked once at first start; nothing is sent before the player answers yes.
       dock.push(`<div class="box consent"><b>Help improve the advisor?</b>
@@ -200,8 +269,37 @@
         Never the game log, screenshots, your Steam ID or names. Turn it off or delete it any time from the tray icon.</div>
         <div class="buttons"><span class="btn primary" data-share="yes">Share</span><span class="btn" data-share="no">Don't share</span></div></div>`);
     }
+    const lights = `<span class="lights" title="Game · Log"><span class="light ${s.health.game}"></span><span class="light ${s.health.log}"></span></span>`;
     const panelShown = s.screen !== "none" || s.showPanel;
-    if (panelShown) {
+    if (s.prices) {
+      const p = s.prices;
+      const chips = (attr, list, on) => list.map(([v, text, tip]) => `<span class="goal ${v === on ? "on" : ""}" ${attr}="${v}"${tip ? ` title="${esc(tip)}"` : ""}>${text}</span>`).join("");
+      const rows = p.rows.map((r) => {
+        const icon = r.icon ? `<img src="${esc(r.icon)}" alt="">` : '<span class="noicon"></span>';
+        // Green: done in the last hour; grey: today; amber: older than a day.
+        const cls = r.fresh ? "ok" : r.stale ? "old" : "";
+        const st = r.source === "manual"
+          ? `<span class="${cls}" title="Typed by you, ${esc(r.age)} ago">✎ ${esc(r.age)}</span>`
+          : r.price !== null
+            ? `<span class="${cls}" title="Price-checked in the Trade House ${esc(r.age)} ago">${r.fresh ? "✓" : "○"} ${esc(r.age)}</span>`
+            : r.learnable ? '<span class="todo" title="Click the name, paste it in the Trade House search and check its price: the overlay learns the item">● learn</span>'
+            : '<span class="todo" title="Price-check it in the Trade House">● check</span>';
+        // Narrow column: "Transcendence Wedge (Rare)" shows as "Wedge (Rare)".
+        const shown = r.name.replace("Transcendence Wedge", "Wedge");
+        return `<tr><td>${icon}</td><td class="name" data-copy="${esc(r.key)}" title="${esc(r.name)}: click to copy it for the Trade House search">${esc(shown)}</td>
+          <td><input data-price="${esc(r.key)}" data-manual="${r.source === "manual" ? 1 : ""}" value="${r.price === null ? "" : priceText(r.price)}" placeholder="FE"></td><td class="st">${st}</td></tr>`;
+      }).join("");
+      const open = !folded[p.where];
+      const body = open
+        ? `<table class="ptable"><tr><th></th><th>Item <span class="faint">(click to copy)</span></th><th>FE each</th><th>Checked</th></tr>${rows}</table>
+          <div class="opts" title="Buy only offers worth this much more than they cost"><span class="opt-label">Profit margin</span><input data-margin value="${p.margin}" inputmode="numeric"><span>%</span></div>
+          <div class="opts"><span class="opt-label">My stones are</span><span class="goals">${chips("data-source", [["bought", "Bought", "Bought in the Trade House: each costs its price there"], ["farmed", "Farmed", "Farmed yourself: each costs what selling it would earn (after tax)"]], p.source)}</span></div>
+          <div class="status">${esc(p.status)}</div>`
+        : "";
+      dock.push(`<div class="box panel">
+        <div class="brand drag" data-drag="${p.where}" title="Drag to move">${SAIL}<h1 class="grow">Blessings from Gods</h1>${lights}<span class="fold" data-fold="${p.where}" title="${open ? "Fold the table" : "Show the table"}">${open ? "−" : "+"}</span></div>
+        ${body}</div>`);
+    } else if (panelShown) {
       const picks = s.picks.map((p) => `<div class="pick"><span class="dot ${p.rarity ?? ""}"></span>${esc(p.label)}</div>`).join("");
       const goals = s.goals.map((g) => `<span class="goal ${g.id === s.goal ? "on" : ""}" data-goal="${esc(g.id)}">${esc(g.label)}</span>`).join("");
       const ask = s.askGoal ? '<div class="ask">New cycle: what do you farm?</div>' : "";
@@ -210,7 +308,6 @@
            <div class="detail">${s.lastChest.scraps} Scraps · ${s.lastChest.threads} Threads · ${s.lastChest.heroMemories} Memories · ${s.lastChest.invitations} Invitations</div></div>`
         : "";
       const set = s.setScore !== null && s.picks.length ? `<div class="set">Set so far <b>×${s.setScore.toFixed(2)}</b> a chest without Whispers</div>` : "";
-      const lights = `<span class="lights" title="Game · Log"><span class="light ${s.health.game}"></span><span class="light ${s.health.log}"></span></span>`;
       const report = s.share.available ? `<div class="foot">Wrong read? <span class="link" data-report>Report it</span> · Ctrl+Shift+R</div>` : "";
       dock.push(`<div class="box panel">
         <div class="brand">${SAIL}<h1 class="grow">Black Sail</h1><span class="chip">Cycle ${s.cycle} · ${s.picks.length}/6</span>${lights}</div>
@@ -218,9 +315,29 @@
         <div class="picks">${picks || '<div class="detail">No Whispers picked yet</div>'}</div>${chest}
         <div class="status">${esc(s.status)}</div>${s.notice ? `<div class="notice">${esc(s.notice)}</div>` : ""}${report}</div>`);
     } else if (s.notice) dock.push(`<div class="box detail">${esc(s.notice)}</div>`);
-    if (dock.length) html.push(`<div class="dock" id="dock">${dock.join("")}</div>`);
+    // On the shop the top right holds its 7th card: the dock moves to the empty left side; in the
+    // Trade House it goes right of the search bar.
+    // Where the player dragged the price table to (1920x1080 coordinates), else the place's default.
+    const moved = s.prices && placed[s.prices.where];
+    const at = moved ? ` style="left:${moved.x}px; top:${moved.y}px"` : "";
+    if (dock.length) html.push(`<div class="dock ${s.prices ? s.prices.where : ""}" id="dock"${at}>${dock.join("")}</div>`);
 
+    // A redraw while the player types in the table keeps the input, its text and the cursor.
+    const active = document.activeElement;
+    const typing = active && active.tagName === "INPUT" && stage.contains(active)
+      ? { attr: active.hasAttribute("data-margin") ? "data-margin" : `data-price="${active.dataset.price}"`, value: active.value, start: active.selectionStart, end: active.selectionEnd }
+      : null;
+    rendering = true;
     stage.innerHTML = html.join("");
+    rendering = false;
+    if (typing) {
+      const again = stage.querySelector(`input[${typing.attr}]`);
+      if (again) {
+        again.value = typing.value;
+        again.focus();
+        again.setSelectionRange(typing.start, typing.end);
+      } else window.overlay.setEditing(false);
+    }
     // The main process makes the window clickable while the cursor is inside the dock (screen
     // pixels of the window, scale included). The game keeps mouse events to itself, so the page
     // can't detect hovering on its own.
@@ -229,13 +346,115 @@
     window.overlay.setPanelRect(r ? { x: r.left, y: r.top, width: r.width, height: r.height } : null);
   }
 
-  window.overlay.onState(render);
+  // The last state, to draw again when the page itself changes something (folding the table).
+  let last = null;
+  window.overlay.onState((s) => {
+    last = s;
+    render(s);
+  });
   stage.addEventListener("click", (e) => {
     const g = e.target.closest("[data-goal]");
     if (g) window.overlay.setGoal(g.dataset.goal);
     const share = e.target.closest("[data-share]");
     if (share) window.overlay.setShare(share.dataset.share === "yes");
     if (e.target.closest("[data-report]")) window.overlay.report();
+    const source = e.target.closest("[data-source]");
+    if (source) window.overlay.setShopOptions({ source: source.dataset.source });
+    const copy = e.target.closest("[data-copy]");
+    if (copy) window.overlay.copyItem(copy.dataset.copy);
+    const fold = e.target.closest("[data-fold]");
+    if (fold) {
+      folded[fold.dataset.fold] = !folded[fold.dataset.fold];
+      try {
+        localStorage.setItem("folded", JSON.stringify(folded));
+      } catch {}
+      if (last) render(last);
+    }
+  });
+
+  // The price table folded to its title, per place (shop / Trade House); remembered on this PC.
+  let folded = {};
+  try {
+    folded = JSON.parse(localStorage.getItem("folded") ?? "{}") ?? {};
+  } catch {}
+
+  // The price table dragged by its title, per place; remembered on this PC. Positions are in the
+  // stage's 1920x1080 coordinates (the stage is scaled to the game window).
+  let placed = {};
+  try {
+    placed = JSON.parse(localStorage.getItem("placed") ?? "{}") ?? {};
+  } catch {}
+  let drag = null;
+  stage.addEventListener("mousedown", (e) => {
+    const handle = e.target.closest("[data-drag]");
+    if (!handle || e.target.closest("[data-fold]") || e.button !== 0) return;
+    const dock = document.getElementById("dock");
+    const k = stage.getBoundingClientRect().width / 1920;
+    drag = { where: handle.dataset.drag, k, sx: e.clientX, sy: e.clientY, x: dock.offsetLeft, y: dock.offsetTop };
+    window.overlay.setDragging(true);
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!drag) return;
+    // Kept inside the game area, at least the title on screen.
+    const x = Math.round(Math.min(1920 - 80, Math.max(0, drag.x + (e.clientX - drag.sx) / drag.k)));
+    const y = Math.round(Math.min(1080 - 40, Math.max(0, drag.y + (e.clientY - drag.sy) / drag.k)));
+    // Looked up each time: a redraw during the drag replaces the dock element.
+    const dock = document.getElementById("dock");
+    if (!dock) return;
+    dock.style.left = `${x}px`;
+    dock.style.top = `${y}px`;
+    placed[drag.where] = { x, y };
+    const r = dock.getBoundingClientRect();
+    window.overlay.setPanelRect({ x: r.left, y: r.top, width: r.width, height: r.height });
+  });
+  window.addEventListener("mouseup", () => {
+    if (!drag) return;
+    drag = null;
+    window.overlay.setDragging(false);
+    try {
+      localStorage.setItem("placed", JSON.stringify(placed));
+    } catch {}
+  });
+
+  // The table's inputs: the overlay takes the keyboard while one has focus; Enter or leaving the
+  // field saves it, Escape puts the old value back.
+  let rendering = false;
+  const number = (text) => {
+    const v = Number(String(text).trim().replace(",", "."));
+    return String(text).trim() && Number.isFinite(v) ? v : null;
+  };
+  stage.addEventListener("mouseover", (e) => {
+    if (e.target.tagName === "INPUT") window.overlay.setOverInput(true);
+  });
+  stage.addEventListener("mouseout", (e) => {
+    if (e.target.tagName === "INPUT") window.overlay.setOverInput(false);
+  });
+  stage.addEventListener("focusin", (e) => {
+    if (e.target.tagName === "INPUT") {
+      e.target.dataset.was = e.target.value;
+      window.overlay.setEditing(true);
+    }
+  });
+  stage.addEventListener("focusout", (e) => {
+    const t = e.target;
+    if (rendering || t.tagName !== "INPUT") return;
+    window.overlay.setEditing(false);
+    if (t.value === t.dataset.was) return;
+    if (t.hasAttribute("data-margin")) {
+      const m = number(t.value);
+      if (m !== null && m >= 0 && m < 100) window.overlay.setShopOptions({ margin: m });
+    } else if (t.dataset.price) {
+      const v = number(t.value);
+      // Emptied: back to the last price check (only a typed price can be cleared).
+      if (v === null && !t.value.trim() && t.dataset.manual) window.overlay.setShopPrice(t.dataset.price, null);
+      else if (v !== null && v > 0) window.overlay.setShopPrice(t.dataset.price, v);
+    }
+  });
+  stage.addEventListener("keydown", (e) => {
+    if (e.target.tagName !== "INPUT") return;
+    if (e.key === "Escape") e.target.value = e.target.dataset.was ?? e.target.value;
+    if (e.key === "Enter" || e.key === "Escape") e.target.blur();
   });
   window.overlay.onBackground((url) => {
     document.body.style.background = `url("${url}") 0 0 / 1920px 1080px no-repeat`;

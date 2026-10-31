@@ -2,7 +2,7 @@
 // sends a small "what to draw" state to a transparent, click-through window over the game.
 // Started by start.mjs (registers tsx so this TypeScript runs as-is).
 
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from "electron";
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from "electron";
 import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { release, tmpdir } from "node:os";
@@ -18,10 +18,18 @@ import { COLLECTOR } from "../share/endpoint.js";
 import { MAX_IMAGE, type Kind } from "../share/schema.js";
 import { Sharer } from "../share/sharer.js";
 import { Engine } from "../engine/engine.js";
-import { findLog, gameLogDirs, gameProgram, gameRunning, STALE_MS } from "../engine/findLog.js";
+import { findLog, GAME_PROCESS, gameLogDirs, gameProgram, gameRunning, STALE_MS } from "../engine/findLog.js";
+import { ForegroundWatcher, type Foreground } from "../capture/foreground.js";
 import { LogDetail } from "../engine/logDetail.js";
 import { readGameLogState, type GameLogState } from "../engine/gameLogState.js";
 import { LogTailer } from "../engine/logReader.js";
+import { PriceBook } from "../engine/prices.js";
+import { BlessingsFromGodsModule, TRADE_HOUSE } from "../modules/blessings-from-gods/index.js";
+import { valueOffer, type StoneSource, type Verdict } from "../modules/blessings-from-gods/calc.js";
+import { DEFAULT_PROFIT_MARGIN, searchText, STONE_ITEM, type ShopItem } from "../modules/blessings-from-gods/items.js";
+import { FRESH_PRICE_MS, ShopPrices, STALE_PRICE_MS, TABLE_ITEMS } from "../modules/blessings-from-gods/shopPrices.js";
+import { mergeReads, readShopPage, SHOP_SLOTS, type ShopRead } from "../modules/blessings-from-gods/shopReader.js";
+import { SHOP_PAGE, ShopWatcher, type ShopEvent } from "../modules/blessings-from-gods/shopWatcher.js";
 import { configForGoal, DEFAULT_GOAL, loadAdvisorConfig, setScore, type Tier } from "../modules/black-sail/advisor.js";
 import { chestReport } from "../modules/black-sail/calibrate.js";
 import { reasonFor } from "../modules/black-sail/reasons.js";
@@ -51,7 +59,26 @@ import { TesseractOcr, type ScreenKind } from "../ocr/tesseractOcr.js";
 export interface OverlayState {
   /** Game client area inside the overlay window (window pixels). */
   game: { x: number; y: number; width: number; height: number };
-  screen: "none" | "cards" | "flames";
+  screen: "none" | "cards" | "flames" | "shop";
+  /** Blessings from Gods shop: a verdict per card (x = card centre, y = art top). */
+  shop: {
+    /** `gamble`: a box of random stones ("100–900"), valued at its average. `short`: stones missing to afford a Buy. */
+    offers: { x: number; y: number; label: string; stones: number | null; maxStones: number | null; verdict: Verdict; profit: number | null; why: string | null; gamble: string | null; short: number | null }[];
+    /** Refresh clicked: the offers are being replaced, the verdicts are for the old cards (drawn as "Reading…"). */
+    reading: boolean;
+  } | null;
+  /**
+   * Blessings from Gods price table, on the shop (left side) or in the Trade House (checklist): per
+   * item its price (checked or typed), how old, `stale` = to price-check, `learnable` = no item id yet.
+   */
+  prices: {
+    where: "shop" | "tradehouse";
+    /** `fresh` = checked or typed in the last hour (done on this visit), `stale` = older than a day or none. */
+    rows: { key: string; name: string; icon: string | null; price: number | null; source: "check" | "manual" | null; age: string | null; fresh: boolean; stale: boolean; learnable: boolean }[];
+    margin: number;
+    source: StoneSource;
+    status: string;
+  } | null;
   view: "three" | "switch";
   /**
    * One line per card: badge (rank / tie), tier (S-D, the card on its own), effect label, the reason
@@ -143,6 +170,8 @@ async function main() {
   const state: OverlayState = {
     game: { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height },
     screen: "none",
+    shop: null,
+    prices: null,
     view: "three",
     cards: [],
     switchCard: null,
@@ -243,6 +272,9 @@ async function main() {
   let healthKey = "";
   let tooltip = "TLI Overlay";
   let hideTimer: NodeJS.Timeout | undefined;
+  /** Told whether the modules may run: the checks passed and their card is gone (set once the engine exists). */
+  let gateModules: (on: boolean) => void = () => {};
+  let modulesOn = false;
   function refreshHealth(): boolean {
     const now = Date.now();
     const running = gameSince > 0;
@@ -279,11 +311,16 @@ async function main() {
           : `Logging is on only because of recent game crashes, and this is the last game start it does that. Next time, press ${ENABLE}, then log out and back in.`;
       else if (log === "bad" && left === 0) note = "The game doesn't remember Enable Log: press it each time you start the game.";
     }
+    // The screen readers were measured at 16:9 (1920x1080): another shape (16:10, ultrawide) is untested.
+    const ratio = state.game.height ? state.game.width / state.game.height : 16 / 9;
+    const shapeOff = windowSeen && Math.abs(ratio - 16 / 9) > 0.05;
+    if (!note && shapeOff) note = "Your game window isn't 16:9: the overlay is only tested at 16:9 (like 1920x1080) and may misread screens.";
     const ready = game === "ok" && log === "ok";
     const key = `${game}|${log}`;
     if (key !== healthKey) {
       healthKey = key;
-      showUntil = now + 8000;
+      // "Ready to play" is shown briefly, then the card goes and the modules start.
+      showUntil = now + (ready ? 2500 : 8000);
     }
     // Updated whenever its text changes (a note can change while the lights don't).
     const tip = `TLI Overlay · ${ready ? "Ready to play" : problem ?? (running ? "Starting…" : "Game not running")}${note ? `\n${note}` : ""}`;
@@ -293,12 +330,18 @@ async function main() {
     }
     // Few forced starts left: the warning stays up for the first minute of play.
     const lastStarts = note !== null && left !== null && left <= 2 && running && now - gameSince < 60_000;
-    const show = now < showUntil || (running && !ready) || lastStarts;
+    // ...and an untested screen shape, for the first minute of play.
+    const shapeWarn = shapeOff && running && now - gameSince < 60_000;
+    const show = now < showUntil || (running && !ready) || lastStarts || shapeWarn;
     clearTimeout(hideTimer);
     if (now < showUntil) hideTimer = setTimeout(() => refreshHealth() && send(), showUntil - now + 50);
     const next = { game, gameText, log, logText, ready, problem, note, show };
     const changed = JSON.stringify(next) !== JSON.stringify(state.health);
     state.health = next;
+    // The modules start once the game and its log passed the checks and "Ready to play" has gone (a
+    // note kept up for its first minute doesn't hold them); then they stop only when a check fails,
+    // not when the card shows again (the exe started a second time).
+    gateModules(ready && (modulesOn || now >= showUntil));
     return changed;
   }
   const shareSession = () => {
@@ -333,6 +376,20 @@ async function main() {
   });
   let fallbackNoted = false;
 
+  /**
+   * Puts the overlay on the game's monitor and its drawings over the game's client area (screen
+   * pixels). From each grab, and as soon as the game's window is found (the startup status card on
+   * the game's monitor, e.g. the second one, not the primary).
+   */
+  function followGame(client: { x: number; y: number; width: number; height: number }) {
+    if (win.isDestroyed()) return;
+    const dip = screen.screenToDipRect(null, client);
+    const target = screen.getDisplayMatching(dip).bounds;
+    const b = win.getBounds();
+    if (b.x !== target.x || b.y !== target.y || b.width !== target.width || b.height !== target.height) win.setBounds(target);
+    state.game = { x: dip.x - target.x, y: dip.y - target.y, width: dip.width, height: dip.height };
+  }
+
   /** Grabs a frame and remembers where the game window is, so drawings line up with it. */
   const grabAs = (screenName: string) => async (trigger: string): Promise<GrabResult> => {
     const path = keepFrames || keepOwned(trigger) ? dataset.framePath(screenName, trigger) : join(scratch, `${screenName}_${Date.now()}.jpg`);
@@ -356,14 +413,7 @@ async function main() {
       windowSeen = g.ok;
       refreshHealth();
     }
-    if (g.ok && g.x !== undefined && g.y !== undefined && !win.isDestroyed()) {
-      const dip = screen.screenToDipRect(null, { x: g.x, y: g.y, width: g.width, height: g.height });
-      // Follow the game to whichever monitor it is on (the window starts on the primary one).
-      const target = screen.getDisplayMatching(dip).bounds;
-      const b = win.getBounds();
-      if (b.x !== target.x || b.y !== target.y || b.width !== target.width || b.height !== target.height) win.setBounds(target);
-      state.game = { x: dip.x - target.x, y: dip.y - target.y, width: dip.width, height: dip.height };
-    }
+    if (g.ok && g.x !== undefined && g.y !== undefined) followGame({ x: g.x, y: g.y, width: g.width, height: g.height });
     return g;
   };
 
@@ -431,10 +481,30 @@ async function main() {
   // cursor position and make the window clickable only while it is inside the panel.
   let panelRect: { x: number; y: number; width: number; height: number } | null = null;
   let interactive = false;
+  // While the player drags the panel, the window keeps the mouse even when the cursor runs ahead of it.
+  let dragging = false;
+  // Windows refuses a background window's own request for the keyboard (win.focus() from the overlay
+  // did nothing while the game was in front), but the player's click on a window always activates it.
+  // So the overlay is made focusable while the mouse is over one of the table's inputs (a click there
+  // then takes the keyboard) and while one has it; clicks anywhere else leave the game the keyboard.
+  let editing = false;
+  let overInput = false;
+  const updateFocusable = () => {
+    if (!win.isDestroyed()) win.setFocusable(editing || overInput);
+  };
+
   ipcMain.on("panelRect", (_e, rect: typeof panelRect) => (panelRect = rect));
+  ipcMain.on("dragging", (_e, on: boolean) => {
+    dragging = !!on;
+    if (dragging && !win.isDestroyed()) {
+      interactive = true;
+      win.setIgnoreMouseEvents(false);
+    }
+  });
   const cursorPoll = setInterval(() => {
     // The window closes when the app quits (or a --demo ends): stop polling instead of touching it.
     if (win.isDestroyed()) return clearInterval(cursorPoll);
+    if (dragging) return;
     const c = screen.getCursorScreenPoint();
     const b = win.getBounds();
     const [x, y] = [c.x - b.x, c.y - b.y];
@@ -442,6 +512,11 @@ async function main() {
     const inside = r !== null && x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height;
     if (inside === interactive) return;
     interactive = inside;
+    // Left the panel: no input can be under the mouse (an input redrawn under it sends no mouseout).
+    if (!inside && overInput) {
+      overInput = false;
+      updateFocusable();
+    }
     win.setIgnoreMouseEvents(!inside);
   }, 100);
   ipcMain.on("goal", (_e, goal: string) => {
@@ -625,6 +700,197 @@ async function main() {
     send();
   };
 
+  // Blessings from Gods: Trade House prices from the player's price checks (data/prices.json) value
+  // each offer the shop shows; a badge on every card says buy or skip.
+  const prices = new PriceBook(); // the demo reads them too, and never saves (save: !demoMode below)
+  await prices.load();
+  // The player's choices, typed prices and learned item ids live in settings.blessing.
+  settings.blessing ??= { source: "bought", margin: DEFAULT_PROFIT_MARGIN };
+  const custom = settings.blessing;
+  const shopPrices = new ShopPrices(prices, custom);
+  const saveCustom = () => {
+    if (!demoMode) saveSettings(settings).catch((err) => console.error(`settings: ${err}`));
+  };
+  let shopRead: ShopRead | null = null;
+  /** Refresh clicked and its new offers not read yet. */
+  let shopReading = false;
+  /** Divinity Stones in the bag, from the log (null until a bag line was seen). */
+  let stoneBalance: number | null = null;
+  let tradeHouse = false;
+  let priceNote: string | null = null;
+  /** Short age for the table's narrow column: now, 5m, 3h, 2d. */
+  const age = (time: number) => {
+    const h = (Date.now() - time) / 3_600_000;
+    if (h < 1 / 60) return "now"; // a price just typed or checked
+    return h < 1 ? `${Math.round(h * 60)}m` : h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`;
+  };
+  // Icons shipped in data/blessings-from-gods/icons/<item id>.webp (from TLIDB); none = a plain mark.
+  const iconOf = (item: ShopItem) => {
+    const id = shopPrices.idOf(item);
+    // .png: cut from a game frame where TLIDB had none (Divinity Fragment: its Trade House pop-up).
+    const file = id === null ? null : [".webp", ".png"].map((ext) => join(APP_DIR, "data/blessings-from-gods/icons", `${id}${ext}`)).find((f) => existsSync(f));
+    return file ? pathToFileURL(file).href : null;
+  };
+  /** The badges on the shop's cards: the offers last read, valued with the current prices and options. */
+  function showShop() {
+    if (!shopRead) return;
+    const stone = shopPrices.get(STONE_ITEM);
+    state.shop = {
+      offers: shopRead.offers.map((o) => {
+        const slot = SHOP_SLOTS[o.slot]!;
+        const v = valueOffer(o.item, o.quantity, o.stones, shopPrices, { source: custom.source, marginPercent: custom.margin });
+        let why: string | null = null;
+        // No name at all but a price: the cards dimmed by an item pop-up (overlay started with it open).
+        if (!o.item) why = o.text.trim() ? "unknown item" : "close the pop-up to read";
+        else if (v.value === null) why = o.item.untraded && !custom.manual?.[o.item.id] ? "can't be sold" : "no price yet";
+        else if (!stone) why = "no stone price";
+        else if (o.stones === null) why = "price not read";
+        const box = o.item?.contents;
+        // A Buy costing more stones than the bag has (from the log) is marked, not hidden.
+        const short = v.verdict === "buy" && stoneBalance !== null && o.stones !== null && o.stones > stoneBalance ? o.stones - stoneBalance : null;
+        return { x: slot.cx, y: slot.top, label: o.item ? `${o.item.name} x${o.quantity}` : o.text, stones: o.stones, maxStones: v.maxStones, verdict: v.verdict, profit: v.profit, why, gamble: box ? `${box.min}–${box.max}` : null, short };
+      }),
+      reading: shopReading,
+    };
+    state.screen = "shop";
+  }
+  /** The price table: on the shop (left side) or in the Trade House (the checklist to price-check). */
+  function showPrices() {
+    const where = tradeHouse ? "tradehouse" : state.screen === "shop" ? "shop" : null;
+    if (!where) {
+      state.prices = null;
+      return;
+    }
+    const rows = TABLE_ITEMS.map((item) => {
+      const p = shopPrices.get(item);
+      return {
+        key: item.id,
+        name: item.name,
+        icon: iconOf(item),
+        price: p?.price ?? null,
+        source: p?.source ?? null,
+        age: p ? age(p.time) : null,
+        fresh: !!p && Date.now() - p.time <= FRESH_PRICE_MS,
+        stale: !p || Date.now() - p.time > STALE_PRICE_MS,
+        learnable: shopPrices.idOf(item) === null,
+      };
+    });
+    const offers = state.shop?.offers ?? [];
+    const buys = offers.filter((o) => o.verdict === "buy" && o.short === null).length;
+    const unaffordable = offers.filter((o) => o.verdict === "buy" && o.short !== null).length;
+    const have = stoneBalance === null ? "" : ` · you have ${stoneBalance} stones`;
+    const toCheck = rows.filter((r) => !r.fresh).length;
+    const status =
+      priceNote ??
+      (where === "tradehouse"
+        ? toCheck ? `${toCheck} to price-check: click a name to copy it, paste it in Search, then check its price` : "Every price checked in the last hour"
+        : (buys ? `${buys} offer${buys > 1 ? "s" : ""} worth buying` : unaffordable ? `${unaffordable} worth buying, but not enough stones` : offers.some((o) => o.verdict === "skip") ? "Nothing worth buying: Refresh or come back later" : "Prices needed to judge the offers") + have);
+    state.prices = { where, rows, margin: custom.margin, source: custom.source, status };
+  }
+  const onShop = (e: ShopEvent) => {
+    // Until the new offers are read (or the shop is covered / closed), the old verdicts stay hidden.
+    if (e.kind !== "skipped") shopReading = e.kind === "changing";
+    if (e.kind === "changing") {
+      // The old verdicts must not sit on the new cards while they are read.
+      if (state.shop) state.shop.reading = true;
+      priceNote = "Reading the new offers…";
+    } else if (e.kind === "read") {
+      if (priceNote === "Reading the new offers…") priceNote = null;
+      // What was read is recorded as read; the badges keep names a dimmed re-read lost.
+      // New offers (open, Refresh) start over; other re-reads keep names a dimmed read lost.
+      shopRead = e.trigger === "open" || e.trigger === "changed" ? e.read : mergeReads(shopRead, e.read);
+      record("shop", { trigger: e.trigger, frame: frameName(e.file), ms: e.ms, offers: e.read.offers.map((o) => ({ slot: o.slot, ocr: o.text, item: o.item?.id ?? null, quantity: o.quantity, stones: o.stones })) });
+      showShop();
+    } else if (e.kind === "skipped") priceNote = `Shop not read: ${e.reason}`;
+    else {
+      // Another page over the shop, or the shop closed: draw nothing.
+      state.screen = "none";
+      state.shop = null;
+      if (e.kind === "closed") shopRead = null;
+    }
+    showPrices();
+    send();
+  };
+  const refresh = () => {
+    showShop();
+    showPrices();
+    send();
+  };
+  const blessing = new BlessingsFromGodsModule({
+    prices,
+    save: !demoMode,
+    onEvent: (e) => {
+      if (e.kind === "tradeHouseOpen" || e.kind === "tradeHouseClosed") {
+        tradeHouse = e.kind === "tradeHouseOpen";
+        priceNote = null;
+        return refresh();
+      }
+      if (e.kind === "stones") {
+        stoneBalance = e.count;
+        return refresh();
+      }
+      if (e.kind !== "price") return;
+      console.log(`price: ${e.check.itemId} = ${prices.get(e.check.itemId)?.price} FE (${e.check.prices.length} listings)`);
+      const learned = shopPrices.learn(e.check);
+      if (learned) {
+        console.log(`learned: ${learned.name} = item ${e.check.itemId}`);
+        priceNote = `Learned ${learned.name} (item ${e.check.itemId})`;
+        saveCustom();
+      } else priceNote = null;
+      refresh();
+    },
+  });
+  ipcMain.on("shopOptions", (_e, o: { source?: StoneSource; margin?: number }) => {
+    if (o.source === "farmed" || o.source === "bought") custom.source = o.source;
+    if (typeof o.margin === "number" && o.margin >= 0 && o.margin < 100) custom.margin = o.margin;
+    saveCustom();
+    refresh();
+  });
+  // A price typed in the table (null: back to the last price check).
+  ipcMain.on("shopPrice", (_e, key: string, price: number | null) => {
+    const item = TABLE_ITEMS.find((i) => i.id === key);
+    if (!item || (price !== null && !(price > 0 && Number.isFinite(price)))) return;
+    shopPrices.setManual(item, price);
+    priceNote = null;
+    saveCustom();
+    refresh();
+  });
+  // An item name clicked: on the clipboard, to paste in the Trade House search.
+  const COPIED_NOTE_MS = 10_000;
+  let copiedTimer: NodeJS.Timeout | undefined;
+  ipcMain.on("copyItem", (_e, key: string) => {
+    const item = TABLE_ITEMS.find((i) => i.id === key);
+    if (!item) return;
+    const text = searchText(item);
+    clipboard.writeText(text);
+    shopPrices.noteCopied(item);
+    // Cut to the 16 characters the search box takes: several items may come up ("Transcendence We").
+    const pick = text !== (item.search ?? item.name) ? `, pick ${item.name}` : "";
+    const note = `Copied "${text}": paste it in Search${pick}, then check its price${shopPrices.idOf(item) === null ? " to teach the overlay this item" : ""}`;
+    priceNote = note;
+    showPrices();
+    send();
+    // A while later the status line is the checklist's again (unless another note replaced this one).
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      if (priceNote !== note) return;
+      priceNote = null;
+      showPrices();
+      send();
+    }, COPIED_NOTE_MS);
+  });
+  // Typing in the table needs keyboard focus, which the overlay otherwise never takes from the game.
+  ipcMain.on("overInput", (_e, on: boolean) => {
+    overInput = !!on;
+    updateFocusable();
+  });
+  ipcMain.on("editing", (_e, on: boolean) => {
+    if (win.isDestroyed()) return;
+    editing = !!on;
+    updateFocusable();
+    if (!editing) win.blur(); // the keyboard back to the game
+  });
+
   // --demo <screenshot> [out.png]: read a saved screenshot through the real readers + advisor,
   // draw the overlay over it, save a picture and quit (to check the drawing without the game).
   const demo = process.argv.indexOf("--demo");
@@ -645,7 +911,17 @@ async function main() {
       state.goal = tracker.goal;
       state.askGoal = false;
     }
-    if (cards.view !== "none") onCards({ kind: "read", trigger: "open", read: cards, ms: 0 });
+    // The shop before the flames: the flame icon test finds "flames" in the shop's card art.
+    const [shopPage] = await tesseract.ocrImages([image], [], "shop");
+    await tesseract.stop();
+    const shop = readShopPage(shopPage!);
+    // --trade-house: the screenshot is the Trade House (nothing on it to read): show the price checklist.
+    if (process.argv.includes("--trade-house")) {
+      tradeHouse = true;
+      showPrices();
+      send();
+    } else if (cards.view !== "none") onCards({ kind: "read", trigger: "open", read: cards, ms: 0 });
+    else if (shop.offers.length) onShop({ kind: "read", trigger: "open", read: shop, ms: 0 });
     else if (flames.slots.length) {
       const fw = new FlameWatcher({ grab: async () => ({ ok: false, reason: "demo" }), ocr: ocrImages, icons, effects, onEvent: onFlames });
       fw.learn(flames);
@@ -710,7 +986,36 @@ async function main() {
     new SealWhisperWatcher({ grab: grabAs("voidport"), ocr, done, table, onEvent: onCards }),
     tracker,
     salvage,
+    blessing,
+    new ShopWatcher({ grab: grabAs("shop"), ocr: (paths, regions, kind) => tesseract.ocrImages(paths, regions, kind), done, onEvent: onShop }),
   ]);
+
+  // The modules run only after the start checks passed (gateModules, from refreshHealth). Until then
+  // a line only keeps the bag's stack sizes and the Trade House prices; the last open / close line of
+  // each screen the modules use is kept, and replayed when they start, so a screen already open is
+  // read then. Turned off again (game closed, log no longer written), the drawings go.
+  type Line = Parameters<typeof engine.feed>[0];
+  const MODULE_PAGE = /^TipMsgShowMgr@DispatchPageRunChange PageName = (VoidBeacon|VoidPort|GroceryStoreV3|AuctionHouseV2) , PageRunState = (?:Run|Destory)/;
+  const lastPage = new Map<string, Line>();
+  const feed = (line: Line) => {
+    const page = MODULE_PAGE.exec(line.text);
+    if (page) lastPage.set(page[1]!, line);
+    if (modulesOn) return engine.feed(line);
+    engine.prime(line);
+    blessing.passiveLine(line);
+  };
+  gateModules = (on) => {
+    if (on === modulesOn) return;
+    modulesOn = on;
+    console.log(`modules ${on ? "started" : "held"}`);
+    if (on) {
+      for (const line of [...lastPage.values()].sort((a, b) => a.lineNo - b.lineNo)) engine.feed(line);
+      return;
+    }
+    Object.assign(state, { screen: "none", cards: [], switchCard: null, switchHint: null, flames: [], shop: null, prices: null });
+    shopRead = null;
+    tradeHouse = false;
+  };
 
   console.log(`log file (${found?.by ?? "not found"}): ${found?.path ?? "-"}`);
   logBy = found?.by ?? "not found";
@@ -739,12 +1044,16 @@ async function main() {
   // a stack already in the bag (Threads, Compasses) is counted after a restart.
   const follow = async (path: string) => {
     logDetail.reset();
+    lastPage.clear(); // another log: its screens, not the last one's
     const scan = new CycleScanner();
+    // The last open / close line of the shop and of the Trade House.
+    let shopLine: Parameters<typeof engine.feed>[0] | null = null;
+    let tradeLine: Parameters<typeof engine.feed>[0] | null = null;
     const t = new LogTailer(
       path,
       (line) => {
         logDetail.note(line);
-        engine.feed(line);
+        feed(line);
       },
       {
         fromEnd: true,
@@ -752,7 +1061,10 @@ async function main() {
         prime: (line) => {
           logDetail.note(line);
           engine.prime(line);
+          blessing.passiveLine(line);
           scan.line(line);
+          if (SHOP_PAGE.test(line.text)) shopLine = line;
+          else if (TRADE_HOUSE.test(line.text)) tradeLine = line;
         },
         // Started mid-cycle: catch up on picks and chests from the logs, and read a screen already open.
         primed: async () => {
@@ -768,12 +1080,19 @@ async function main() {
               state.status = `Caught up from the game log: pick ${tracker.currentPicks.length + 1}/6`;
               send();
             }
-            if (scan.openScreen && (await gameRunning())) engine.feed(scan.openScreen);
+            // A screen already open is read once the modules start (feed keeps it until then).
+            if (scan.openScreen && (await gameRunning())) feed(scan.openScreen);
+            // The Blessings from Gods shop or the Trade House already open: show them then.
+            else if (shopLine?.text.includes("= Run") && (await gameRunning())) feed(shopLine);
+            if (tradeLine?.text.includes("= Run") && (await gameRunning())) feed(tradeLine);
           } catch (err) {
             console.error(`cycle catch-up: ${err instanceof Error ? err.stack : err}`);
           }
         },
-        onRotate: () => logDetail.reset(),
+        onRotate: () => {
+          logDetail.reset();
+          lastPage.clear(); // a new game session's log: the old screens are gone
+        },
       },
     );
     const t0 = Date.now();
@@ -802,12 +1121,23 @@ async function main() {
       const running = await gameRunning();
       if (running && !gameSince) {
         gameSince = Date.now();
+        applyVisibility();
         program = await gameProgram(); // once per game start
         console.log(`game started: ${program ?? "program not readable"}`);
-      } else if (!running) [gameSince, program, windowSeen] = [0, null, false];
+      } else if (!running && gameSince) {
+        [gameSince, program, windowSeen] = [0, null, false];
+        applyVisibility();
+      }
       // The window appears a while after the process: asked until seen (one PowerShell helper,
       // kept warm between asks, stopped 20 s after the last).
-      if (running && !windowSeen) windowSeen = await worker.window().then((w) => w.ok, () => false);
+      if (running && !windowSeen) {
+        const w = await worker.window().catch(() => null);
+        windowSeen = !!w?.ok;
+        if (w?.ok) {
+          followGame(w.client);
+          send();
+        }
+      }
       const next = search();
       if (next?.path !== found?.path) {
         console.log(`log file (${next?.by ?? "not found"}): ${next?.path ?? "-"}`);
@@ -828,6 +1158,38 @@ async function main() {
     }
   };
   const gamePoll = setInterval(() => void lookAgain(), 5000);
+
+  // Out of the way while the player works in another app over the game (Alt+Tab): with the game
+  // running, the overlay is hidden while a window that isn't the game or the overlay itself (typing in
+  // the price table) is in front and covers the game. One on another monitor leaves the game in view,
+  // so the overlay stays. Without the game it stays as it was, so the status card can say what's missing.
+  let foreground: Foreground | null = null;
+  function applyVisibility() {
+    if (win.isDestroyed()) return;
+    const inFront = foreground === null || foreground.name.toLowerCase() === GAME_PROCESS || foreground.pid === process.pid;
+    const show = !gameSince || inFront || !foreground!.covers;
+    if (show && !win.isVisible()) {
+      win.showInactive(); // back without taking the keyboard from the game
+      win.setAlwaysOnTop(true, "screen-saver");
+      console.log(`overlay shown (${foreground?.name || "?"} in front)`);
+    } else if (!show && win.isVisible()) {
+      win.hide();
+      console.log(`overlay hidden (${foreground?.name || "?"} in front)`);
+    }
+  }
+  const foregroundWatcher = new ForegroundWatcher(
+    (fg) => {
+      foreground = fg;
+      applyVisibility();
+    },
+    (m) => console.log(`[foreground] ${m}`),
+    () => {
+      // The helper can't run on this PC: always drawn, as before this check existed.
+      foreground = null;
+      applyVisibility();
+    },
+  );
+  foregroundWatcher.start();
 
   // The first-start question (panel), and the tray's switch.
   const setSharing = async (on: boolean) => {
@@ -972,7 +1334,9 @@ async function main() {
     // No more polls while quitting: one could start the PowerShell helper again after its stop.
     clearInterval(gamePoll);
     clearInterval(cursorPoll);
+    foregroundWatcher.stop();
     clearTimeout(hideTimer);
+    clearTimeout(copiedTimer);
     globalShortcut.unregisterAll();
     capture.dispose();
     worker.stop();

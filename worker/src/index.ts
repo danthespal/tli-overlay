@@ -66,7 +66,10 @@ async function body(req: Request): Promise<unknown> {
   if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY) throw new Error("too large");
   const text = await req.text();
   if (text.length > MAX_BODY) throw new Error("too large");
-  return JSON.parse(text);
+  const value: unknown = JSON.parse(text);
+  // JSON but not an object ("null", "5"): a bad request too, not a 500 on reading its fields.
+  if (typeof value !== "object" || value === null) throw new SyntaxError("body is not a JSON object");
+  return value;
 }
 
 function authorized(req: Request, env: Env): boolean {
