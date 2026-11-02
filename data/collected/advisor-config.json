@@ -76,7 +76,7 @@
         "p": 0.166
       }
     ],
-    "doubledRate": 0.244,
+    "doubledRate": 0.24,
     "tieFraction": 0.03
   },
   "goals": {
@@ -110,9 +110,9 @@
     ]
   },
   "calibration": {
-    "time": "2026-10-30T19:06:03.125Z",
+    "time": "2026-11-02T16:56:36.154Z",
     "chests": 29,
-    "screens": 193,
+    "screens": 196,
     "flames": 193,
     "salvaged": 80
   }
