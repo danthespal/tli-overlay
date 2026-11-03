@@ -19,9 +19,10 @@ import { PNG } from "pngjs";
 import { createScheduler, createWorker, PSM, type Scheduler, type Worker } from "tesseract.js";
 import { OWNED_COUNT, OWNED_TEXT } from "../modules/black-sail/ownedReader.js";
 import { CHECK_REGIONS, pillSlot } from "../modules/black-sail/pill.js";
-import { cardInSlot, NAME_CROP, PRICE_CROP, priceDigits, SHOP_SLOTS, type ShopSlot } from "../modules/blessings-from-gods/shopReader.js";
+import { findShopSlots, matchItem, NAME_CROP, offerSize, PRICE_CROP, priceDigits, splitQuantity, type ShopSlot } from "../modules/blessings-from-gods/shopReader.js";
 import { APP_DIR } from "../paths.js";
 import type { OcrLine, OcrPage, OcrRegion, Region } from "./windowsOcr.js";
+import { gameViewport } from "../layout.js";
 
 export const TESSDATA = resolve(APP_DIR, "data/tessdata-fast");
 
@@ -124,9 +125,8 @@ export function fingerprint(px: Pixels, x: number, y: number, w: number, h: numb
 
 /** Region statistics for regions given in 1920x1080 coordinates. */
 export function regionStats(px: Pixels, regions: Region[]): OcrRegion[] {
-  const sx = px.width / 1920;
-  const sy = px.height / 1080;
-  return regions.map(([x, y, w, h]) => fingerprint(px, x * sx, y * sy, w * sx, h * sy));
+  const { x: ox, y: oy, scale } = gameViewport(px.width, px.height);
+  return regions.map(([x, y, w, h]) => fingerprint(px, ox + x * scale, oy + y * scale, w * scale, h * scale));
 }
 
 /**
@@ -178,7 +178,7 @@ interface TessWord {
 
 /** Tesseract's lines, re-cut at wide gaps into pieces with their own boxes and text colour. */
 export function piecesOf(lines: { words: TessWord[] }[], px: Pixels): OcrLine[] {
-  const gap = (PIECE_GAP * px.width) / 1920;
+  const gap = PIECE_GAP * gameViewport(px.width, px.height).scale;
   const out: OcrLine[] = [];
   for (const line of lines) {
     let piece: TessWord[] = [];
@@ -298,12 +298,10 @@ export class TesseractOcr {
     return started;
   }
 
-  /** OCR of one crop (1920x1080 coordinates); pieces come back in frame coordinates. `digits`: numbers only. */
+  /** OCR of one crop in the normalized 1920x1080 UI. `digits`: numbers only. */
   private async crop(px: Pixels, region: Region, psm: PSM, threshold = 0, digits = false, upscale?: number): Promise<OcrLine[]> {
-    const sx = px.width / 1920;
-    const sy = px.height / 1080;
     const [x, y, w, h] = region;
-    const box = clampBox(px, x * sx, y * sy, w * sx, h * sy);
+    const box = clampBox(px, x, y, w, h);
     if (box.x1 <= box.x0 || box.y1 <= box.y0) return [];
     const scale = upscale ?? (digits ? DIGITS_SCALE : SCALE);
     const bmp = cropBmp(px, box, scale, threshold);
@@ -335,7 +333,7 @@ export class TesseractOcr {
   private async card(px: Pixels, cx: number): Promise<OcrLine[]> {
     const region = CARD_CROP(cx);
     const [raw, bin] = await Promise.all([this.crop(px, region, PSM.SINGLE_BLOCK), this.crop(px, region, PSM.SINGLE_BLOCK, BINARIZE_AT)]);
-    const effectY = 700 * (px.height / 1080);
+    const effectY = 700;
     const titles = raw.filter((l) => l.y < effectY);
     return letters(bin, effectY) > letters(raw, effectY) ? [...titles, ...bin.filter((l) => l.y >= effectY)] : raw;
   }
@@ -363,11 +361,44 @@ export class TesseractOcr {
     return [];
   }
 
+  /** A high-resolution card can lose thin text at 200: retry only names without a valid offer size. */
+  private async shopName(px: Pixels, s: ShopSlot): Promise<OcrLine[]> {
+    let first: OcrLine[] = [];
+    for (const threshold of [SHOP_TEXT_AT, 160, 0]) {
+      const lines = await this.crop(px, NAME_CROP(s), PSM.SINGLE_BLOCK, threshold);
+      if (threshold === SHOP_TEXT_AT) first = lines;
+      const { name, quantity } = splitQuantity(lines.map((l) => l.text).join(" "));
+      const item = matchItem(name);
+      if (item && offerSize(item, quantity)) return lines;
+    }
+    return first;
+  }
+
   /** Reads one decoded frame for a screen kind: text pieces plus the requested region statistics. */
   async readPixels(px: Pixels, file: string, regions: Region[] = [], kind: ScreenKind = "cards"): Promise<OcrPage> {
     this.active++;
     try {
-      return await this.read(px, file, regions, kind);
+      if (px.width === 1920 && px.height === 1080) return await this.read(px, file, regions, kind);
+      // Read a reference-sized UI so crop sampling and glyph sizes stay the same at every
+      // resolution. Map boxes back to the original frame for the readers and saved diagnostics.
+      const viewport = gameViewport(px.width, px.height);
+      const width = kind === "shop" ? Math.round(px.width / viewport.scale) : 1920;
+      const ox = kind === "shop" ? 0 : viewport.x;
+      const data = new Uint8Array(width * 1080 * 4);
+      for (let y = 0; y < 1080; y++) for (let x = 0; x < width; x++) {
+        // Sample pixel centers without blurring the thin white text before thresholding it.
+        const sx = Math.min(px.width - 1, Math.floor(ox + (x + 0.5) * viewport.scale));
+        const sy = Math.floor(viewport.y + (y + 0.5) * viewport.scale);
+        const from = (sy * px.width + sx) * 4;
+        const to = (y * width + x) * 4;
+        data[to] = px.data[from]!; data[to + 1] = px.data[from + 1]!; data[to + 2] = px.data[from + 2]!;
+        data[to + 3] = 255;
+      }
+      const page = await this.read({ width, height: 1080, data }, file, regions, kind);
+      return { ...page, width: px.width, height: px.height, lines: page.lines.map((l) => ({ ...l,
+        x: ox + l.x * viewport.scale, y: viewport.y + l.y * viewport.scale,
+        w: l.w * viewport.scale, h: l.h * viewport.scale,
+      })) };
     } finally {
       this.active--;
       this.touchIdle();
@@ -379,8 +410,9 @@ export class TesseractOcr {
     if (kind === "flames") lines = await this.crop(px, FLAME_CROP, PSM.SINGLE_BLOCK);
     else if (kind === "shop") {
       // Name and price of each card on screen; empty grid slots are skipped by a pixel test.
-      const slots = SHOP_SLOTS.filter((s) => cardInSlot(px, s));
-      lines = (await Promise.all(slots.flatMap((s) => [this.crop(px, NAME_CROP(s), PSM.SINGLE_BLOCK, SHOP_TEXT_AT), this.price(px, s)]))).flat();
+      const slots = findShopSlots(px);
+      lines = (await Promise.all(slots.flatMap((s) => [this.shopName(px, s), this.price(px, s)]))).flat();
+      return { file: basename(file), width: px.width, height: px.height, lines, regions: regionStats(px, regions), shopSlots: slots };
     }
     else if (kind === "owned") lines = (await Promise.all([this.crop(px, OWNED_TEXT, PSM.SINGLE_BLOCK), this.crop(px, OWNED_COUNT, PSM.SINGLE_LINE)])).flat();
     else if (kind === "select") {

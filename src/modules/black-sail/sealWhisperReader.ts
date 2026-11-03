@@ -7,6 +7,7 @@
 // See mechanics/black-sail/07-choice-screens.md.
 
 import type { OcrLine, OcrPage } from "../../ocr/windowsOcr.js";
+import { referenceLines } from "../../layout.js";
 import { matchEffect, similarity, template, type EffectEntry, type EffectMatch, type Rarity } from "./effects.js";
 
 export type WhisperType = "Wealth" | "Armament" | "Wonder" | "Boss Whisper";
@@ -99,10 +100,7 @@ export function matchInGroup(ocrText: string, doubled: boolean, table: EffectEnt
 }
 
 export function readSealWhisperPage(page: OcrPage, table: EffectEntry[]): SealWhisperRead {
-  const sx = page.width / 1920;
-  const sy = page.height / 1080;
-  // Normalise to 1920x1080 so the layout constants work at any resolution.
-  const lines = page.lines.map((l) => ({ ...l, x: l.x / sx, y: l.y / sy, w: l.w / sx, h: l.h / sy }));
+  const lines = referenceLines(page);
 
   const columns: Record<Slot, OcrLine[]> = { left: [], middle: [], right: [] };
   for (const l of lines) {

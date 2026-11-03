@@ -42,6 +42,8 @@ export interface OcrPage {
   lines: OcrLine[];
   /** One entry per requested region, in order. */
   regions: OcrRegion[];
+  /** Detected shop cards in left-anchored reference coordinates (the grid can reflow). */
+  shopSlots?: import("../modules/blessings-from-gods/shopReader.js").ShopSlot[];
 }
 
 /** A region as [x, y, w, h] in 1920x1080 coordinates (scaled to each image by the script). */

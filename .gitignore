@@ -16,3 +16,5 @@ data/advisor-config.json
 data/advisor-config.json.tmp
 data/prices.json
 data/prices.json.tmp
+test/fixtures/ultrawide-3840x1600/
+test/ultrawide.test.ts

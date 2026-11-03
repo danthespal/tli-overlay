@@ -10,6 +10,7 @@
 
 import type { OcrLine, OcrPage, Region } from "../../ocr/windowsOcr.js";
 import type { Pixels } from "../../ocr/tesseractOcr.js";
+import { gameViewport, referenceLines } from "../../layout.js";
 import { similarity } from "../black-sail/effects.js";
 import { SHOP_ITEMS, type ShopItem } from "./items.js";
 
@@ -44,11 +45,10 @@ export const NAME_CROP = (s: ShopSlot): Region => [s.cx - 74, s.top + 125, 148, 
 export const PRICE_CROP = (s: ShopSlot): Region => [s.cx - 5, s.top + ART_H + 4, 60, 32];
 
 const mean = (px: Pixels, x0: number, y0: number, w: number, h: number) => {
-  const sx = px.width / 1920;
-  const sy = px.height / 1080;
+  const { y: oy, scale } = gameViewport(px.width, px.height);
   let sum = 0, n = 0;
-  for (let y = Math.round(y0 * sy); y < Math.round((y0 + h) * sy); y++) {
-    for (let x = Math.round(x0 * sx); x < Math.round((x0 + w) * sx); x++) {
+  for (let y = Math.round(oy + y0 * scale); y < Math.round(oy + (y0 + h) * scale); y++) {
+    for (let x = Math.round(x0 * scale); x < Math.round((x0 + w) * scale); x++) {
       const i = (y * px.width + x) * 4;
       sum += (px.data[i]! + px.data[i + 1]! + px.data[i + 2]!) / 3;
       n++;
@@ -70,6 +70,42 @@ export function cardInSlot(px: Pixels, s: ShopSlot): boolean {
   return edge > 120 && strip < 70 && edge - strip > 90;
 }
 
+/** Find the bright art edges in a normalized, full-width shop; ultrawide menus reflow their cards. */
+export function findShopSlots(px: Pixels): ShopSlot[] {
+  if (px.width === 1920) return SHOP_SLOTS.filter((s) => cardInSlot(px, s));
+  const found: { cx: number; row: number; top: number }[] = [];
+  const brightness = (x: number, y: number) => {
+    const i = (y * px.width + x) * 4;
+    return (px.data[i]! + px.data[i + 1]! + px.data[i + 2]!) / 3;
+  };
+  for (let row = 0; row < SHOP_ROWS; row++) {
+    const top = ROW_Y0 + ROW_DY * row;
+    for (let y = top + ART_H - 6; y < top + ART_H + 2; y++) {
+      let start = -1;
+      for (let x = 0; x <= px.width; x++) {
+        const on = x < px.width && brightness(x, y) > 120 && brightness(x, y + 12) < 70;
+        if (on && start < 0) start = x;
+        if (on || start < 0) continue;
+        // The coloured edge may be dim on its left. Its right end is the art's right edge.
+        const cx = x - 72;
+        if (x - start >= 60 && x - start <= 160 && cx >= COL_X0 - 10
+          && !found.some((s) => s.row === row && Math.abs(s.cx - cx) < 4)) found.push({ cx, row, top });
+        start = -1;
+      }
+    }
+  }
+  found.sort((a, b) => a.row - b.row || a.cx - b.cx);
+  const gaps = found.flatMap((s, i) => {
+    const prev = found[i - 1];
+    const gap = prev && prev.row === s.row ? s.cx - prev.cx : 0;
+    return gap > 160 && gap < 210 ? [gap] : [];
+  }).sort((a, b) => a - b);
+  const pitch = gaps.length ? gaps[Math.floor(gaps.length / 2)]! : COL_DX;
+  const slots = found.map((s) => ({ ...s, col: Math.max(0, Math.round((s.cx - COL_X0) / pitch)) }));
+  const columns = Math.max(SHOP_COLUMNS, ...slots.map((s) => s.col + 1));
+  return slots.map((s) => ({ ...s, slot: s.row * columns + s.col }));
+}
+
 /**
  * How many digits the price under a card has, from the pixels: the white shapes in the price crop,
  * separated by dark columns. Only near-white pixels count (bright, colour spread under 50): the
@@ -79,18 +115,17 @@ export function cardInSlot(px: Pixels, s: ShopSlot): boolean {
  * read is then refused, not wrong. Null when nothing is lit.
  */
 export function priceDigits(px: Pixels, s: ShopSlot): number | null {
-  const sx = px.width / 1920;
-  const sy = px.height / 1080;
+  const { y: oy, scale } = gameViewport(px.width, px.height);
   const [x, y, w, h] = PRICE_CROP(s);
   const lit: boolean[] = [];
-  for (let c = Math.round(x * sx); c < Math.round((x + w) * sx); c++) {
+  for (let c = Math.round(x * scale); c < Math.round((x + w) * scale); c++) {
     let n = 0;
-    for (let r = Math.round(y * sy); r < Math.round((y + h) * sy); r++) {
+    for (let r = Math.round(oy + y * scale); r < Math.round(oy + (y + h) * scale); r++) {
       const i = (r * px.width + c) * 4;
       const [R, G, B] = [px.data[i]!, px.data[i + 1]!, px.data[i + 2]!];
       if ((R + G + B) / 3 >= 140 && Math.max(R, G, B) - Math.min(R, G, B) < 50) n++;
     }
-    lit.push(n >= 2);
+    lit.push(n >= 2 * scale);
   }
   let digits = 0;
   let start = -1;
@@ -98,7 +133,7 @@ export function priceDigits(px: Pixels, s: ShopSlot): number | null {
   lit.forEach((on, k) => {
     if (on && start < 0) start = k;
     if (on || start < 0) return;
-    if ((k - start) / sx >= 2) digits++; // a 1 px speck isn't a digit
+    if ((k - start) / scale >= 2) digits++; // a 1 px speck isn't a digit
     start = -1;
   });
   return digits || null;
@@ -115,6 +150,8 @@ export interface ShopOffer {
   quantity: number;
   /** Divinity Stones, from the strip under the art; null = not read. */
   stones: number | null;
+  /** Badge position in the centered overlay's reference coordinates. */
+  position?: { cx: number; top: number };
 }
 
 export interface ShopRead {
@@ -182,7 +219,8 @@ export function mergeReads(prev: ShopRead | null, next: ShopRead): ShopRead {
   return {
     offers: next.offers.map((o) => {
       const old = prev.offers.find((p) => p.slot === o.slot);
-      return !o.item && old?.item && old.stones === o.stones ? { ...o, text: old.text, item: old.item, quantity: old.quantity } : o;
+      const samePosition = !o.position || !old?.position || (Math.abs(o.position.cx - old.position.cx) < 4 && Math.abs(o.position.top - old.position.top) < 4);
+      return !o.item && old?.item && old.stones === o.stones && samePosition ? { ...o, text: old.text, item: old.item, quantity: old.quantity } : o;
     }),
   };
 }
@@ -202,11 +240,10 @@ export function offerSize(item: ShopItem, quantity: number): number | null {
 
 /** Offers in reading order; a slot with no text read in it has no card. */
 export function readShopPage(page: OcrPage): ShopRead {
-  const sx = page.width / 1920;
-  const sy = page.height / 1080;
-  const lines = page.lines.map((l) => ({ ...l, x: l.x / sx, y: l.y / sy, w: l.w / sx, h: l.h / sy }));
+  const lines = referenceLines(page, "left");
+  const viewport = gameViewport(page.width, page.height);
   const offers: ShopOffer[] = [];
-  for (const s of SHOP_SLOTS) {
+  for (const s of page.shopSlots ?? SHOP_SLOTS) {
     const text = reading(lines.filter((l) => inside(l, NAME_CROP(s))));
     const digits = reading(lines.filter((l) => inside(l, PRICE_CROP(s)))).replace(/[Oo]/g, "0").replace(/[^0-9]/g, "");
     if (!text && !digits) continue;
@@ -214,7 +251,8 @@ export function readShopPage(page: OcrPage): ShopRead {
     const item = matchItem(name);
     const size = item && offerSize(item, quantity);
     // An amount that fits none of the item's sizes clearly gets no verdict (no item) rather than a guess.
-    offers.push({ slot: s.slot, row: s.row, col: s.col, text, item: size ? item : null, quantity: size ?? quantity, stones: digits ? +digits : null });
+    offers.push({ slot: s.slot, row: s.row, col: s.col, text, item: size ? item : null, quantity: size ?? quantity, stones: digits ? +digits : null,
+      position: { cx: s.cx - viewport.x / viewport.scale, top: s.top } });
   }
   return { offers };
 }

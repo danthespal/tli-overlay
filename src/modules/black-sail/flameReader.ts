@@ -11,6 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { OcrPage, OcrRegion, Region } from "../../ocr/windowsOcr.js";
+import { referenceLines } from "../../layout.js";
 import { numbers, similarity, template } from "./effects.js";
 import { joinPieces } from "./sealWhisperReader.js";
 import { APP_DIR } from "../../paths.js";
@@ -182,10 +183,7 @@ export function readFlamePage(page: OcrPage, refs: IconRef[], effects: FlameEffe
   });
 
   // The selected flame's text sits centred under the circle.
-  const sx = page.width / 1920;
-  const sy = page.height / 1080;
-  const textLines = page.lines
-    .map((l) => ({ ...l, x: l.x / sx, y: l.y / sy, w: l.w / sx, h: l.h / sy }))
+  const textLines = referenceLines(page)
     .filter((l) => l.y >= 660 && l.y <= 760 && l.x >= 640 && l.x + l.w <= 1290);
   const selectedText = joinPieces(textLines);
 

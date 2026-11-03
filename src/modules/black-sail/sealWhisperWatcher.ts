@@ -16,6 +16,7 @@ import type { ToolModule } from "../../engine/module.js";
 import { TriggerScheduler } from "../../capture/triggerScheduler.js";
 import type { GrabResult } from "../../capture/windowCapture.js";
 import type { OcrPage, OcrRegion, Region } from "../../ocr/windowsOcr.js";
+import { referenceLines } from "../../layout.js";
 import { similarity, template, type EffectEntry } from "./effects.js";
 import { DIAMOND_REGIONS, readOwnedPage, type OwnedRead } from "./ownedReader.js";
 import { readSealWhisperPage, type SealWhisperRead, type Slot } from "./sealWhisperReader.js";
@@ -247,19 +248,16 @@ export class SealWhisperWatcher implements ToolModule {
  * brightness. OCR sometimes garbles it ("C0\"firm", "Corf?"), so the position decides.
  */
 export function confirmSlot(page: OcrPage): Slot | null {
-  const sx = page.width / 1920;
-  const sy = page.height / 1080;
-  const hit = page.lines.find((l) => {
-    const [y, w] = [l.y / sy, l.w / sx];
+  const hit = referenceLines(page).find((l) => {
+    const { y, w } = l;
     return y >= 815 && y <= 865 && w >= 110 && w <= 180 && similarity(template(l.text), "confirm") >= 0.4;
   });
   if (!hit) return null;
-  const cx = (hit.x + hit.w / 2) / sx;
+  const cx = hit.x + hit.w / 2;
   return cx < 740 ? "left" : cx < 1180 ? "middle" : "right";
 }
 
 /** True when the frame still shows the card screen: OCR text in the cards' title/effect band. */
 export function hasCardText(page: OcrPage): boolean {
-  const sy = page.height / 1080;
-  return page.lines.some((l) => l.y / sy >= 630 && l.y / sy <= 805);
+  return referenceLines(page).some((l) => l.y >= 630 && l.y <= 805);
 }

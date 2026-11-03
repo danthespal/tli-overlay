@@ -42,6 +42,10 @@ The watcher grabs **one frame only when the log says a choice screen opened, a f
 
 Text is read by **Tesseract.js** (WebAssembly; the English model ships in `data/tessdata-fast`, so no Windows language pack is needed): per-card crops upscaled 2x, raw and binarised, three engines in parallel, ~0.8 s per card screen, ~0.4 s per flame screen (`src/ocr/tesseractOcr.ts`). `TLI_OCR=windows` switches back to Windows OCR for comparison. Window rectangles and the fallback copy run in one PowerShell helper (`scripts/worker.ps1`) with the same start/stop.
 
+`src/layout.ts` defines a proportional, centered 1920×1080 UI viewport inside the game client. OCR normalizes its pixels to that reference size, then returns text boxes in the original frame's coordinates; readers and overlay badges use the same viewport. The Tesseract shop path retains the full window width, detects bright card edges when the grid reflows, and carries their positions through `OcrPage.shopSlots` into each offer's badge position. Price tables anchor to the left client edge and can be dragged through ultrawide side space. The Windows OCR comparison path retains the legacy shop grid.
+
+The layout tests cover 1080p, 1440p, 4K, 16:10 and common ultrawide sizes using generated frames. Real 3840×1600 card, flame, shop and Trade House screenshots were additionally validated locally, including the shop's single-row layout and badge positions. The private screenshots and their associated local tests are not distributed. Other aspect ratios and the owned-Whispers panel still need real frames. No resolution selection is needed.
+
 `npm run overlay -- --hide-from-captures` content-protects the overlay window (out of screenshots and streams); off by default because on a transparent window it can leave the overlay undrawn. `npm run overlay -- --probe-capture <dir>` saves one frame of each kind with the game running.
 
 ## Finding the log and Enable Log

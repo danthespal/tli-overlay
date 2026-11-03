@@ -112,7 +112,7 @@ The modules start once both are green: the card says **✓ Ready to play** and g
 
 - **Click-through:** your clicks go to the game, except on the overlay's panels. Drag a panel by its title to move it, and fold it with **−**.
 - **Out of the way:** while another window covers the game (Alt+Tab), the overlay hides. A window on your other monitor doesn't count.
-- **Screen shape:** the readers are made for **16:9** (like 1920x1080). On another shape the card warns you that it may misread.
+- **Resolution:** the readers and badges scale proportionally from **1920×1080 through 3840×2160 (4K)**. Black Sail uses the centered game UI; the shop reader detects card positions when the offers reflow on ultrawide screens. **3840×1600** card, flame, shop and Trade House screenshots were verified locally. Other ultrawide layouts and the owned-Whispers panel still need real screenshot validation. Report wrong reads with **Ctrl+Shift+R**.
 
 ## 🧭 The tray icon
 

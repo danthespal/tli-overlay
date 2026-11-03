@@ -54,6 +54,7 @@ import { autoCalibrate } from "../modules/black-sail/autoCalibrate.js";
 import { CycleScanner, cycleFromLogs } from "../modules/black-sail/cycleScan.js";
 import { ocrImages } from "../ocr/windowsOcr.js";
 import { TesseractOcr, type ScreenKind } from "../ocr/tesseractOcr.js";
+import { gameViewport } from "../layout.js";
 
 /** Everything the window draws. Positions are in 1920x1080 game coordinates; the window scales them. */
 export interface OverlayState {
@@ -193,7 +194,7 @@ async function main() {
   };
   // Timers and late events can fire while the app quits, after the window is gone.
   const send = () => {
-    if (!win.isDestroyed()) win.webContents.send("state", state);
+    if (!win.isDestroyed()) win.webContents.send("state", { ...state, viewport: gameViewport(state.game.width, state.game.height) });
   };
 
   const [table, icons, effects, config] = await Promise.all([loadEffectTable(), loadIconRefs(), loadFlameEffects(), loadAdvisorConfig()]);
@@ -311,10 +312,10 @@ async function main() {
           : `Logging is on only because of recent game crashes, and this is the last game start it does that. Next time, press ${ENABLE}, then log out and back in.`;
       else if (log === "bad" && left === 0) note = "The game doesn't remember Enable Log: press it each time you start the game.";
     }
-    // The screen readers were measured at 16:9 (1920x1080): another shape (16:10, ultrawide) is untested.
+    // Other shapes use a centered, proportional viewport, pending validation on real game frames.
     const ratio = state.game.height ? state.game.width / state.game.height : 16 / 9;
     const shapeOff = windowSeen && Math.abs(ratio - 16 / 9) > 0.05;
-    if (!note && shapeOff) note = "Your game window isn't 16:9: the overlay is only tested at 16:9 (like 1920x1080) and may misread screens.";
+    if (!note && shapeOff) note = "Ultrawide and other non-16:9 layouts use experimental centered scaling. Check badge alignment and report wrong reads (Ctrl+Shift+R).";
     const ready = game === "ok" && log === "ok";
     const key = `${game}|${log}`;
     if (key !== healthKey) {
@@ -737,7 +738,7 @@ async function main() {
     const stone = shopPrices.get(STONE_ITEM);
     state.shop = {
       offers: shopRead.offers.map((o) => {
-        const slot = SHOP_SLOTS[o.slot]!;
+        const slot = o.position ?? SHOP_SLOTS[o.slot]!;
         const v = valueOffer(o.item, o.quantity, o.stones, shopPrices, { source: custom.source, marginPercent: custom.margin });
         let why: string | null = null;
         // No name at all but a price: the cards dimmed by an item pop-up (overlay started with it open).
@@ -897,8 +898,9 @@ async function main() {
   if (demo >= 0) {
     const image = resolve(process.argv[demo + 1]!);
     const out = resolve(process.argv[demo + 2] ?? join(import.meta.dirname, "../../reports/overlay-demo.png"));
-    win.setBounds({ x: 0, y: 0, width: 1920, height: 1080 });
-    state.game = { x: 0, y: 0, width: 1920, height: 1080 };
+    const { width, height } = nativeImage.createFromPath(image).getSize();
+    win.setBounds({ x: 0, y: 0, width, height });
+    state.game = { x: 0, y: 0, width, height };
     // The picture shows the advice with green lights, as when playing (no status card).
     state.health = { ...state.health, game: "ok", gameText: "Window found", log: "ok", logText: "Enable Log on", ready: true, show: false };
     win.webContents.send("background", pathToFileURL(image).href);

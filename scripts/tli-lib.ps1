@@ -179,10 +179,11 @@ function Read-Images([string[]]$Paths, [string]$Regions = '') {
                 [pscustomobject]@{ text = $_.Text; x = [int]$x; y = [int]$y; w = [int]($r - $x); h = [int]($b - $y); color = $color }
             })
             regions = @(if ($Regions) {
-                $sx = $pix.Width / 1920; $sy = $pix.Height / 1080
+                $uiScale = [math]::Min($pix.Width / 1920, $pix.Height / 1080)
+                $ox = ($pix.Width - 1920 * $uiScale) / 2; $oy = ($pix.Height - 1080 * $uiScale) / 2
                 foreach ($spec in $Regions.Split(';')) {
                     $v = $spec.Split(',') | ForEach-Object { [double]$_ }
-                    $rx = [int]($v[0] * $sx); $ry = [int]($v[1] * $sy); $rw = [int]($v[2] * $sx); $rh = [int]($v[3] * $sy)
+                    $rx = [int]($ox + $v[0] * $uiScale); $ry = [int]($oy + $v[1] * $uiScale); $rw = [int]($v[2] * $uiScale); $rh = [int]($v[3] * $uiScale)
                     $bright = 0.0; $max = 0; $lit = 0.0
                     $fp = [TliPix]::Fingerprint($pix, $rx, $ry, $rw, $rh, [ref]$bright, [ref]$max, [ref]$lit)
                     [pscustomobject]@{ gray = $fp; color = [TliPix]::TextColor($pix, $rx, $ry, $rw, $rh); bright = [math]::Round($bright, 4); max = $max; lit = [math]::Round($lit, 4) }

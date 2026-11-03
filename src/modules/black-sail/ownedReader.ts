@@ -9,6 +9,7 @@
 // The text is white whatever the rarity, so the rarity comes from the diamond's colour.
 
 import type { OcrLine, OcrPage, Region } from "../../ocr/windowsOcr.js";
+import { referenceLines } from "../../layout.js";
 import { matchEffect, type EffectEntry, type EffectMatch, type Rarity } from "./effects.js";
 import { joinPieces } from "./sealWhisperReader.js";
 
@@ -71,9 +72,7 @@ function bestMatch(text: string, table: EffectEntry[], rarity: Rarity | null): {
 
 /** `page.regions` must be DIAMOND_REGIONS, in order. */
 export function readOwnedPage(page: OcrPage, table: EffectEntry[]): OwnedRead {
-  const sx = page.width / 1920;
-  const sy = page.height / 1080;
-  const lines = page.lines.map((l) => ({ ...l, x: l.x / sx, y: l.y / sy, w: l.w / sx, h: l.h / sy }));
+  const lines = referenceLines(page);
 
   // Diamonds: runs of lit strips; the colour of the most lit strip of each run.
   const diamonds: { y: number; color: [number, number, number] }[] = [];

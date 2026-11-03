@@ -152,6 +152,14 @@
   // Card text centres on the Seal Whisper screen (1920x1080), see 07-choice-screens.md.
   const CARD_X = { left: 518, middle: 960, right: 1415 };
   const stage = document.getElementById("stage");
+  /** Keep at least the title inside the entire game client, including ultrawide side space. */
+  function clampPanel(x, y, s) {
+    const k = s.viewport.scale;
+    return {
+      x: Math.round(Math.min((s.game.width - s.viewport.x) / k - 80, Math.max(-s.viewport.x / k, x))),
+      y: Math.round(Math.min((s.game.height - s.viewport.y) / k - 40, Math.max(-s.viewport.y / k, y))),
+    };
+  }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   /** FE prices: 4 significant digits below 1 FE (0.0201), 2 decimals above (21, 6.25). */
   const priceText = (v) => (v >= 1 ? String(+v.toFixed(2)) : String(+v.toPrecision(3)));
@@ -180,9 +188,9 @@
   }
 
   function render(s) {
-    const k = s.game.width / 1920;
-    stage.style.left = `${s.game.x}px`;
-    stage.style.top = `${s.game.y}px`;
+    const k = s.viewport.scale;
+    stage.style.left = `${s.game.x + s.viewport.x}px`;
+    stage.style.top = `${s.game.y + s.viewport.y}px`;
     stage.style.transform = `scale(${k})`;
     const html = [];
 
@@ -318,8 +326,10 @@
     // On the shop the top right holds its 7th card: the dock moves to the empty left side; in the
     // Trade House it goes right of the search bar.
     // Where the player dragged the price table to (1920x1080 coordinates), else the place's default.
-    const moved = s.prices && placed[s.prices.where];
-    const at = moved ? ` style="left:${moved.x}px; top:${moved.y}px"` : "";
+    const saved = s.prices && placed[s.prices.where];
+    const moved = saved && clampPanel(saved.x, saved.y, s);
+    const at = moved ? ` style="left:${moved.x}px; top:${moved.y}px"`
+      : s.prices ? ` style="left:${(s.prices.where === "shop" ? 56 : 14) - s.viewport.x / k}px"` : "";
     if (dock.length) html.push(`<div class="dock ${s.prices ? s.prices.where : ""}" id="dock"${at}>${dock.join("")}</div>`);
 
     // A redraw while the player types in the table keeps the input, its text and the cursor.
@@ -397,8 +407,7 @@
   window.addEventListener("mousemove", (e) => {
     if (!drag) return;
     // Kept inside the game area, at least the title on screen.
-    const x = Math.round(Math.min(1920 - 80, Math.max(0, drag.x + (e.clientX - drag.sx) / drag.k)));
-    const y = Math.round(Math.min(1080 - 40, Math.max(0, drag.y + (e.clientY - drag.sy) / drag.k)));
+    const { x, y } = clampPanel(drag.x + (e.clientX - drag.sx) / drag.k, drag.y + (e.clientY - drag.sy) / drag.k, last);
     // Looked up each time: a redraw during the drag replaces the dock element.
     const dock = document.getElementById("dock");
     if (!dock) return;
@@ -457,7 +466,7 @@
     if (e.key === "Enter" || e.key === "Escape") e.target.blur();
   });
   window.overlay.onBackground((url) => {
-    document.body.style.background = `url("${url}") 0 0 / 1920px 1080px no-repeat`;
+    document.body.style.background = `url("${url}") 0 0 / 100vw 100vh no-repeat`;
   });
 </script>
 </body>
