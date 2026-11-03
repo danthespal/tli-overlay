@@ -1,6 +1,6 @@
 # Collected Black Sail data
 
-1265 records from 5 installs, 20 sessions. Newest record: 2026-11-02T16:56:36.154Z.
+1268 records from 6 installs, 21 sessions. Newest record: 2026-11-03T06:39:10.046Z.
 
 ## Records
 
@@ -10,10 +10,10 @@
 | flames | 234 |
 | picked | 197 |
 | flameChosen | 196 |
-| salvage | 36 |
+| salvage | 37 |
 | chest | 32 |
-| session | 20 |
-| capture | 17 |
+| session | 21 |
+| capture | 18 |
 | goal | 4 |
 
 ## App versions (sessions)
@@ -21,7 +21,7 @@
 | version | sessions |
 |---|---|
 | 0.2.0 | 12 |
-| 0.4.0 | 5 |
+| 0.4.0 | 6 |
 | 0.1.0 | 3 |
 
 ## Game screens
@@ -30,12 +30,13 @@
 |---|---|
 | 1920x1080, share | 13 |
 | 3840x1600, share | 4 |
+| 2560x1440, share | 1 |
 
 ## How the log was found
 
 | found | sessions |
 |---|---|
-| in the game folders | 20 |
+| in the game folders | 21 |
 
 ## Reader health
 
