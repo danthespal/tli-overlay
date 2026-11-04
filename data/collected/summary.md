@@ -1,28 +1,28 @@
 # Collected Black Sail data
 
-2141 records from 14 installs, 43 sessions. Newest record: 2026-11-04T06:31:35.535Z.
+2273 records from 15 installs, 44 sessions. Newest record: 2026-11-04T16:13:41.814Z.
 
 ## Records
 
 | kind | records |
 |---|---|
-| cards | 784 |
-| flames | 447 |
-| picked | 305 |
-| flameChosen | 300 |
-| salvage | 78 |
-| goal | 73 |
-| chest | 51 |
-| session | 43 |
-| capture | 38 |
-| bossRun | 22 |
+| cards | 799 |
+| flames | 468 |
+| picked | 321 |
+| flameChosen | 319 |
+| goal | 93 |
+| salvage | 81 |
+| bossRun | 55 |
+| chest | 54 |
+| session | 44 |
+| capture | 39 |
 
 ## App versions (sessions)
 
 | version | sessions |
 |---|---|
+| 0.5.0 | 15 |
 | 0.4.0 | 14 |
-| 0.5.0 | 14 |
 | 0.2.0 | 12 |
 | 0.1.0 | 3 |
 
@@ -30,7 +30,7 @@
 
 | size, frames by | sessions |
 |---|---|
-| 1920x1080, share | 20 |
+| 1920x1080, share | 21 |
 | 3840x1600, share | 10 |
 | 1920x1009, share | 3 |
 | 2560x1440, share | 2 |
@@ -41,13 +41,13 @@
 
 | found | sessions |
 |---|---|
-| in the game folders | 37 |
+| in the game folders | 38 |
 | chosen by the player | 6 |
 
 ## Reader health
 
-- Cards read: 1927, without a matching effect: 4 (0.2%)
-- Flames put in: 300, uncertain: 70
+- Cards read: 1967, without a matching effect: 7 (0.4%)
+- Flames put in: 319, uncertain: 74
 
 | frames not read, because | times |
 |---|---|
@@ -55,13 +55,13 @@
 
 ## Advisor refit on all players (data/collected/advisor-config.json)
 
-37 complete chests, 288 screens, 230 flames, 196 memories salvaged.
+38 complete chests, 302 screens, 245 flames, 196 memories salvaged.
 
 | base amount | shipped | all players |
 |---|---|---|
-| scraps | 78 | 80 |
-| threads | 3.4 | 3.7 |
-| heroMemories | 13.5 | 11.7 |
+| scraps | 78 | 79 |
+| threads | 3.4 | 3.6 |
+| heroMemories | 13.5 | 11.3 |
 | invitations | 0 | 0 |
-| doubled screens | 0.171 | 0.191 |
+| doubled screens | 0.171 | 0.182 |
 | Hero Memory FE | 0.051 | 0.067 |
