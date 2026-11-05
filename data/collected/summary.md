@@ -1,27 +1,27 @@
 # Collected Black Sail data
 
-2273 records from 15 installs, 44 sessions. Newest record: 2026-11-04T16:13:41.814Z.
+2280 records from 15 installs, 45 sessions. Newest record: 2026-11-05T04:51:37.570Z.
 
 ## Records
 
 | kind | records |
 |---|---|
-| cards | 799 |
-| flames | 468 |
-| picked | 321 |
+| cards | 801 |
+| flames | 469 |
+| picked | 322 |
 | flameChosen | 319 |
-| goal | 93 |
+| goal | 94 |
 | salvage | 81 |
 | bossRun | 55 |
 | chest | 54 |
-| session | 44 |
-| capture | 39 |
+| session | 45 |
+| capture | 40 |
 
 ## App versions (sessions)
 
 | version | sessions |
 |---|---|
-| 0.5.0 | 15 |
+| 0.5.0 | 16 |
 | 0.4.0 | 14 |
 | 0.2.0 | 12 |
 | 0.1.0 | 3 |
@@ -31,7 +31,7 @@
 | size, frames by | sessions |
 |---|---|
 | 1920x1080, share | 21 |
-| 3840x1600, share | 10 |
+| 3840x1600, share | 11 |
 | 1920x1009, share | 3 |
 | 2560x1440, share | 2 |
 | 1920x1080, copy | 2 |
@@ -41,12 +41,12 @@
 
 | found | sessions |
 |---|---|
-| in the game folders | 38 |
+| in the game folders | 39 |
 | chosen by the player | 6 |
 
 ## Reader health
 
-- Cards read: 1967, without a matching effect: 7 (0.4%)
+- Cards read: 1971, without a matching effect: 7 (0.4%)
 - Flames put in: 319, uncertain: 74
 
 | frames not read, because | times |
@@ -55,7 +55,7 @@
 
 ## Advisor refit on all players (data/collected/advisor-config.json)
 
-38 complete chests, 302 screens, 245 flames, 196 memories salvaged.
+38 complete chests, 303 screens, 245 flames, 196 memories salvaged.
 
 | base amount | shipped | all players |
 |---|---|---|
