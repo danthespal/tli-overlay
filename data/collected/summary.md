@@ -1,27 +1,28 @@
 # Collected Black Sail data
 
-2280 records from 15 installs, 45 sessions. Newest record: 2026-11-05T04:51:37.570Z.
+2326 records from 16 installs, 50 sessions. Newest record: 2026-11-05T18:53:13.011Z.
 
 ## Records
 
 | kind | records |
 |---|---|
-| cards | 801 |
-| flames | 469 |
-| picked | 322 |
-| flameChosen | 319 |
-| goal | 94 |
+| cards | 802 |
+| flames | 471 |
+| picked | 337 |
+| flameChosen | 334 |
+| goal | 95 |
 | salvage | 81 |
-| bossRun | 55 |
-| chest | 54 |
-| session | 45 |
-| capture | 40 |
+| bossRun | 56 |
+| chest | 55 |
+| session | 50 |
+| capture | 44 |
+| skipped | 1 |
 
 ## App versions (sessions)
 
 | version | sessions |
 |---|---|
-| 0.5.0 | 16 |
+| 0.5.0 | 21 |
 | 0.4.0 | 14 |
 | 0.2.0 | 12 |
 | 0.1.0 | 3 |
@@ -31,27 +32,27 @@
 | size, frames by | sessions |
 |---|---|
 | 1920x1080, share | 21 |
-| 3840x1600, share | 11 |
+| 3840x1600, share | 12 |
+| 1920x1080, copy | 5 |
 | 1920x1009, share | 3 |
 | 2560x1440, share | 2 |
-| 1920x1080, copy | 2 |
 | 1920x1009, copy | 1 |
 
 ## How the log was found
 
 | found | sessions |
 |---|---|
-| in the game folders | 39 |
+| in the game folders | 44 |
 | chosen by the player | 6 |
 
 ## Reader health
 
-- Cards read: 1971, without a matching effect: 7 (0.4%)
-- Flames put in: 319, uncertain: 74
+- Cards read: 1972, without a matching effect: 7 (0.4%)
+- Flames put in: 334, uncertain: 89
 
 | frames not read, because | times |
 |---|---|
-
+| game window is not in front | 1 |
 
 ## Advisor refit on all players (data/collected/advisor-config.json)
 
