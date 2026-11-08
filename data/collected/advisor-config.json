@@ -3,7 +3,7 @@
   "weights": {
     "scraps": 0.076,
     "threads": 0.6,
-    "heroMemories": 0.067,
+    "heroMemories": 0.116,
     "invitations": 18
   },
   "baseAppear": {
@@ -76,7 +76,7 @@
         "p": 0.21
       }
     ],
-    "doubledRate": 0.183,
+    "doubledRate": 0.189,
     "tieFraction": 0.03
   },
   "goals": {
@@ -110,10 +110,10 @@
     ]
   },
   "calibration": {
-    "time": "2026-11-07T16:08:03.162Z",
+    "time": "2026-11-08T04:33:10.693Z",
     "chests": 42,
-    "screens": 327,
+    "screens": 334,
     "flames": 267,
-    "salvaged": 196
+    "salvaged": 213
   }
 }
