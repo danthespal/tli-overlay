@@ -1,6 +1,6 @@
 # Collected Black Sail data
 
-2742 records from 22 installs, 60 sessions. Newest record: 2026-11-11T18:11:42.376Z.
+2743 records from 23 installs, 61 sessions. Newest record: 2026-11-12T23:14:47.402Z.
 
 ## Records
 
@@ -14,7 +14,7 @@
 | salvage | 93 |
 | bossRun | 69 |
 | chest | 64 |
-| session | 60 |
+| session | 61 |
 | capture | 49 |
 | skipped | 2 |
 
@@ -22,7 +22,7 @@
 
 | version | sessions |
 |---|---|
-| 0.5.0 | 31 |
+| 0.5.0 | 32 |
 | 0.4.0 | 14 |
 | 0.2.0 | 12 |
 | 0.1.0 | 3 |
@@ -43,7 +43,7 @@
 
 | found | sessions |
 |---|---|
-| in the game folders | 53 |
+| in the game folders | 54 |
 | chosen by the player | 6 |
 | not found | 1 |
 
