@@ -13,9 +13,9 @@
     "invitations": 0
   },
   "baseAmount": {
-    "scraps": 52,
-    "threads": 2.2,
-    "heroMemories": 6.4,
+    "scraps": 53,
+    "threads": 2.3,
+    "heroMemories": 6.6,
     "invitations": 0
   },
   "rarityWeight": 0.3,
@@ -48,17 +48,17 @@
       {
         "group": "Boss Whisper",
         "minRarity": "white",
-        "p": 0.089
+        "p": 0.092
       },
       {
         "group": "Boss Whisper",
         "minRarity": "blue",
-        "p": 0.1
+        "p": 0.098
       },
       {
         "group": "Boss Whisper",
         "minRarity": "purple",
-        "p": 0.103
+        "p": 0.106
       },
       {
         "group": "Wealth",
@@ -68,15 +68,15 @@
       {
         "group": "Wealth",
         "minRarity": "blue",
-        "p": 0.277
+        "p": 0.275
       },
       {
         "group": "Wealth",
         "minRarity": "purple",
-        "p": 0.165
+        "p": 0.163
       }
     ],
-    "doubledRate": 0.189,
+    "doubledRate": 0.183,
     "tieFraction": 0.03
   },
   "goals": {
@@ -110,10 +110,10 @@
     ]
   },
   "calibration": {
-    "time": "2026-11-26T21:42:45.388Z",
-    "chests": 84,
-    "screens": 684,
-    "flames": 631,
+    "time": "2026-11-26T23:05:37.847Z",
+    "chests": 87,
+    "screens": 704,
+    "flames": 651,
     "salvaged": 219
   }
 }
